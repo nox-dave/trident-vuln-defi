@@ -3,4 +3,5 @@ cache/
 broadcast/
 lib/
 forge-cache/
+.env
 
