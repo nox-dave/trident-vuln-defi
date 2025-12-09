@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+.DS_Store
+*.log
+coverage/
+cache/
+broadcast/
+out/
+lib/
+forge-cache/
+
