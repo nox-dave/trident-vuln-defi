@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { compileSolidity, extractContractName } from '../utils/compiler'
 
-function CodeEditor({ initialCode, onCompile, onRun }) {
+function CodeEditor({ initialCode, onCompile, onRun, compact = false }) {
   const [code, setCode] = useState(initialCode || '')
   const [output, setOutput] = useState('')
   const [isCompiling, setIsCompiling] = useState(false)
@@ -82,20 +82,20 @@ function CodeEditor({ initialCode, onCompile, onRun }) {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'comment', foreground: '808080' },
-        { token: 'keyword', foreground: 'ffffff', fontStyle: 'bold' },
-        { token: 'type', foreground: 'ffffff', fontStyle: 'bold' },
-        { token: 'string', foreground: 'ffffff' },
-        { token: 'number', foreground: 'ffffff' },
-        { token: 'number.hex', foreground: 'ffffff' },
-        { token: 'number.float', foreground: 'ffffff' },
-        { token: 'operator', foreground: 'ffffff' },
-        { token: 'identifier', foreground: 'ffffff' },
-        { token: 'delimiter', foreground: 'ffffff' },
+        { token: 'comment', foreground: '6A9955' },
+        { token: 'keyword', foreground: 'C586C0', fontStyle: 'bold' },
+        { token: 'type', foreground: '4EC9B0', fontStyle: 'bold' },
+        { token: 'string', foreground: 'CE9178' },
+        { token: 'number', foreground: 'B5CEA8' },
+        { token: 'number.hex', foreground: 'B5CEA8' },
+        { token: 'number.float', foreground: 'B5CEA8' },
+        { token: 'operator', foreground: 'D4D4D4' },
+        { token: 'identifier', foreground: '9CDCFE' },
+        { token: 'delimiter', foreground: 'D4D4D4' },
       ],
       colors: {
         'editor.background': '#000000',
-        'editor.foreground': '#ffffff',
+        'editor.foreground': '#D4D4D4',
         'editor.lineHighlightBackground': '#1a1a1a',
         'editor.selectionBackground': '#ff0000',
         'editor.inactiveSelectionBackground': '#330000',
@@ -105,6 +105,10 @@ function CodeEditor({ initialCode, onCompile, onRun }) {
         'editorIndentGuide.background': '#1a1a1a',
         'editorIndentGuide.activeBackground': '#333333',
         'editor.selectionHighlightBorder': '#ff0000',
+        'scrollbar.shadow': '#000000',
+        'scrollbarSlider.background': '#1a1a1a',
+        'scrollbarSlider.hoverBackground': '#ff0000',
+        'scrollbarSlider.activeBackground': '#ff0000',
       },
     })
   }
@@ -177,13 +181,15 @@ function CodeEditor({ initialCode, onCompile, onRun }) {
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.topHeader}>
-        <div style={styles.tridentLogo}>
-          <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
+    <div style={{...styles.container, height: compact ? '100%' : '100vh'}}>
+      {!compact && (
+        <div style={styles.topHeader}>
+          <div style={styles.tridentLogo}>
+            <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
+          </div>
+          <div style={styles.tridentText}>TRIDENT</div>
         </div>
-        <div style={styles.tridentText}>TRIDENT</div>
-      </div>
+      )}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <span style={styles.solidityBadge}>SOLIDITY 0.8.30</span>
@@ -252,7 +258,6 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
     backgroundColor: '#000000',
     color: '#ffffff',
     fontFamily: 'monospace',

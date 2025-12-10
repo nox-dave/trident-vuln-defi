@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAccount, useConfig } from 'wagmi'
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import CodeEditor from './CodeEditor'
+import ChallengeDetailsPanel from './ChallengeDetailsPanel'
 import {
   deployChallenge,
   verifySolution,
@@ -9,6 +10,7 @@ import {
   CHALLENGE_ABI,
 } from '../utils/contractHelpers'
 import { CONTRACT_ADDRESSES } from '../config/contracts'
+import { CHALLENGE_DETAILS } from '../config/challengeDetails'
 import { parseAbi, encodeFunctionData } from 'viem'
 
 const EXPLOIT_TEMPLATE = `// SPDX-License-Identifier: MIT
@@ -51,6 +53,8 @@ function ChallengeInteraction({ challenge, onBack }) {
   const [status, setStatus] = useState('')
   const [exploitCode, setExploitCode] = useState(EXPLOIT_TEMPLATE)
   const [compiledExploit, setCompiledExploit] = useState(null)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(50)
+  const [isResizing, setIsResizing] = useState(false)
 
   const { writeContract: deployChallengeWrite, data: deployHash, isPending: isDeployPending } = useWriteContract()
   const { writeContract: verifyWrite, data: verifyHash, isPending: isVerifyPending } = useWriteContract()
@@ -245,6 +249,43 @@ function ChallengeInteraction({ challenge, onBack }) {
     return match ? match[1] : null
   }
 
+  const handleMouseDown = (e) => {
+    setIsResizing(true)
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing) return
+      const mainContent = document.querySelector('[data-main-content]')
+      if (!mainContent) return
+      const rect = mainContent.getBoundingClientRect()
+      const newWidth = ((e.clientX - rect.left) / rect.width) * 100
+      const clampedWidth = Math.max(20, Math.min(80, newWidth))
+      setLeftPanelWidth(clampedWidth)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
+
+  const challengeDetails = CHALLENGE_DETAILS[challenge.id]
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -254,68 +295,82 @@ function ChallengeInteraction({ challenge, onBack }) {
         <div style={styles.title}>CHALLENGE {challenge.id}: {challenge.name}</div>
       </div>
 
-      <div style={styles.actions}>
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>STEP 1: DEPLOY CHALLENGE</div>
-          {challengeAddress ? (
-            <div style={styles.address}>Deployed: {challengeAddress}</div>
-          ) : (
-            <button
-              style={{...styles.button, opacity: (isDeploying || isDeployPending || isDeployConfirming) ? 0.6 : 1}}
-              onClick={handleDeployChallenge}
-              disabled={isDeploying || isDeployPending || isDeployConfirming}
-            >
-              {(isDeploying || isDeployPending || isDeployConfirming) ? 'DEPLOYING...' : 'DEPLOY CHALLENGE'}
-            </button>
-          )}
+      <div style={styles.mainContent} data-main-content>
+        <div style={{...styles.leftPanel, width: `${leftPanelWidth}%`}}>
+          <ChallengeDetailsPanel challenge={challenge} details={challengeDetails} />
         </div>
 
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>STEP 2: WRITE & COMPILE EXPLOIT</div>
-          <div style={styles.editorWrapper}>
-            <CodeEditor
-              initialCode={exploitCode}
-              onCompile={handleCompileExploit}
-              onRun={() => {}}
-            />
+        <div
+          style={styles.divider}
+          onMouseDown={handleMouseDown}
+        />
+
+        <div style={{...styles.rightPanel, width: `${100 - leftPanelWidth}%`}}>
+          <div style={styles.stepsContainer}>
+            <div style={styles.stepSection}>
+              <div style={styles.stepTitle}>STEP 1: DEPLOY CHALLENGE</div>
+              {challengeAddress ? (
+                <div style={styles.address}>Deployed: {challengeAddress}</div>
+              ) : (
+                <button
+                  style={{...styles.button, opacity: (isDeploying || isDeployPending || isDeployConfirming) ? 0.6 : 1}}
+                  onClick={handleDeployChallenge}
+                  disabled={isDeploying || isDeployPending || isDeployConfirming}
+                >
+                  {(isDeploying || isDeployPending || isDeployConfirming) ? 'DEPLOYING...' : 'DEPLOY CHALLENGE'}
+                </button>
+              )}
+            </div>
+
+            <div style={styles.stepSection}>
+              <div style={styles.stepTitle}>STEP 2: WRITE & COMPILE EXPLOIT</div>
+              <div style={styles.editorWrapper}>
+                <CodeEditor
+                  initialCode={exploitCode}
+                  onCompile={handleCompileExploit}
+                  onRun={() => {}}
+                  compact={true}
+                />
+              </div>
+            </div>
+
+            <div style={styles.stepSection}>
+              <div style={styles.stepTitle}>STEP 3: DEPLOY EXPLOIT</div>
+              {exploitAddress ? (
+                <div style={styles.address}>Deployed: {exploitAddress}</div>
+              ) : (
+                <button
+                  style={{...styles.button, opacity: (isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming || !compiledExploit) ? 0.6 : 1}}
+                  onClick={handleDeployExploit}
+                  disabled={isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming || !compiledExploit}
+                >
+                  {(isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming) ? 'DEPLOYING...' : 'DEPLOY EXPLOIT'}
+                </button>
+              )}
+            </div>
+
+            <div style={styles.stepSection}>
+              <div style={styles.stepTitle}>STEP 4: EXECUTE EXPLOIT</div>
+              <button
+                style={{...styles.button, opacity: (isExecuting || isExecutePending || isExecuteConfirming || !exploitAddress) ? 0.6 : 1}}
+                onClick={handleExecuteExploit}
+                disabled={isExecuting || isExecutePending || isExecuteConfirming || !exploitAddress}
+              >
+                {(isExecuting || isExecutePending || isExecuteConfirming) ? 'EXECUTING...' : 'EXECUTE EXPLOIT'}
+              </button>
+            </div>
+
+            <div style={styles.stepSection}>
+              <div style={styles.stepTitle}>STEP 5: VERIFY SOLUTION</div>
+              <button
+                style={{...styles.button, opacity: (isVerifying || isVerifyPending || isVerifyConfirming) ? 0.6 : 1, backgroundColor: '#ff0000'}}
+                onClick={handleVerify}
+                disabled={isVerifying || isVerifyPending || isVerifyConfirming}
+              >
+                {(isVerifying || isVerifyPending || isVerifyConfirming) ? 'VERIFYING...' : 'VERIFY SOLUTION'}
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>STEP 3: DEPLOY EXPLOIT</div>
-          {exploitAddress ? (
-            <div style={styles.address}>Deployed: {exploitAddress}</div>
-          ) : (
-            <button
-              style={{...styles.button, opacity: (isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming || !compiledExploit) ? 0.6 : 1}}
-              onClick={handleDeployExploit}
-              disabled={isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming || !compiledExploit}
-            >
-              {(isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming) ? 'DEPLOYING...' : 'DEPLOY EXPLOIT'}
-            </button>
-          )}
-        </div>
-
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>STEP 4: EXECUTE EXPLOIT</div>
-          <button
-            style={{...styles.button, opacity: (isExecuting || isExecutePending || isExecuteConfirming || !exploitAddress) ? 0.6 : 1}}
-            onClick={handleExecuteExploit}
-            disabled={isExecuting || isExecutePending || isExecuteConfirming || !exploitAddress}
-          >
-            {(isExecuting || isExecutePending || isExecuteConfirming) ? 'EXECUTING...' : 'EXECUTE EXPLOIT'}
-          </button>
-        </div>
-
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>STEP 5: VERIFY SOLUTION</div>
-          <button
-            style={{...styles.button, opacity: (isVerifying || isVerifyPending || isVerifyConfirming) ? 0.6 : 1, backgroundColor: '#ff0000'}}
-            onClick={handleVerify}
-            disabled={isVerifying || isVerifyPending || isVerifyConfirming}
-          >
-            {(isVerifying || isVerifyPending || isVerifyConfirming) ? 'VERIFYING...' : 'VERIFY SOLUTION'}
-          </button>
         </div>
       </div>
 
@@ -330,7 +385,7 @@ const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    height: 'calc(100vh - 80px)',
     backgroundColor: '#000000',
     color: '#ffffff',
     fontFamily: 'monospace',
@@ -341,6 +396,7 @@ const styles = {
     padding: '16px 24px',
     borderBottom: '2px solid #ff0000',
     gap: '16px',
+    flexShrink: 0,
   },
   backButton: {
     backgroundColor: '#000000',
@@ -357,19 +413,47 @@ const styles = {
     fontSize: '18px',
     fontWeight: 'bold',
   },
-  actions: {
+  mainContent: {
+    display: 'flex',
+    flex: 1,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  leftPanel: {
+    height: '100%',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  divider: {
+    width: '4px',
+    height: '100%',
+    backgroundColor: '#ff0000',
+    cursor: 'col-resize',
+    flexShrink: 0,
+    position: 'relative',
+    zIndex: 10,
+  },
+  rightPanel: {
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  stepsContainer: {
     flex: 1,
     overflow: 'auto',
     padding: '24px',
   },
-  section: {
-    marginBottom: '32px',
+  stepSection: {
+    marginBottom: '24px',
   },
-  sectionTitle: {
+  stepTitle: {
     fontSize: '14px',
     fontWeight: 'bold',
     marginBottom: '12px',
     color: '#ff0000',
+    textTransform: 'uppercase',
   },
   button: {
     backgroundColor: '#000000',
@@ -391,7 +475,7 @@ const styles = {
     border: '1px solid #ffffff',
   },
   editorWrapper: {
-    height: '400px',
+    height: '500px',
     border: '2px solid #ff0000',
   },
   status: {
@@ -401,6 +485,7 @@ const styles = {
     fontSize: '12px',
     fontFamily: 'monospace',
     color: '#ffffff',
+    flexShrink: 0,
   },
 }
 
