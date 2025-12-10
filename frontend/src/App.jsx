@@ -6,11 +6,15 @@ import ChallengeInteraction from './components/ChallengeInteraction'
 function App() {
   const [selectedChallenge, setSelectedChallenge] = useState(null)
 
+  const handleLogoClick = () => {
+    setSelectedChallenge(null)
+  }
+
   if (selectedChallenge) {
     return (
       <div style={styles.app}>
         <div style={styles.topBar}>
-          <div style={styles.logo}>
+          <div style={styles.logo} onClick={handleLogoClick}>
             <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
             <div style={styles.logoText}>TRIDENT</div>
           </div>
@@ -27,7 +31,7 @@ function App() {
   return (
     <div style={styles.app}>
       <div style={styles.topBar}>
-        <div style={styles.logo}>
+        <div style={styles.logo} onClick={handleLogoClick}>
           <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
           <div style={styles.logoText}>TRIDENT</div>
         </div>
@@ -58,6 +62,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
+    cursor: 'pointer',
   },
   logoAscii: {
     margin: 0,

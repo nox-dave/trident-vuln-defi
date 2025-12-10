@@ -10,6 +10,9 @@ function ChallengeCard({ challenge, isSolved, onSelect }) {
       </div>
       <div style={styles.name}>{challenge.name}</div>
       <div style={styles.difficulty}>DIFFICULTY: {challenge.difficulty}</div>
+      {challenge.ascii && (
+        <pre style={styles.ascii}>{challenge.ascii}</pre>
+      )}
       <div style={styles.description}>{challenge.description}</div>
     </div>
   )
@@ -57,6 +60,15 @@ const styles = {
   description: {
     fontSize: '12px',
     color: '#ffffff',
+  },
+  ascii: {
+    fontSize: '10px',
+    lineHeight: '1.2',
+    color: '#ffffff',
+    fontFamily: 'monospace',
+    margin: '8px 0',
+    whiteSpace: 'pre',
+    textAlign: 'center',
   },
 }
 
