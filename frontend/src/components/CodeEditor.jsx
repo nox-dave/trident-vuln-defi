@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { compileSolidity, extractContractName } from '../utils/compiler'
 
@@ -8,6 +8,12 @@ function CodeEditor({ initialCode, onCompile, onRun, compact = false }) {
   const [isCompiling, setIsCompiling] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [compiledContract, setCompiledContract] = useState(null)
+
+  useEffect(() => {
+    if (initialCode && initialCode !== code) {
+      setCode(initialCode)
+    }
+  }, [initialCode])
 
   const handleEditorWillMount = (monaco) => {
     monaco.languages.register({ id: 'solidity' })
