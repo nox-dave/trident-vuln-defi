@@ -1,77 +1,80 @@
 import { useState } from 'react'
-import CodeEditor from './components/CodeEditor'
-
-const initialCode = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
-
-import {IChallenge} from "../interfaces/IChallenge.sol";
-
-contract Challenge1_Vault is IChallenge {
-    bool public solved;
-    
-    uint256 public constant CHALLENGE_ID = 1;
-    string public constant CHALLENGE_NAME = "Vault Reentrancy";
-    string public constant DIFFICULTY = "Easy";
-    
-    mapping(address => uint256) public balances;
-    
-    event ChallengeSolved(address indexed solver, uint256 timestamp);
-    
-    function isSolved() external view returns (bool) {
-        return solved;
-    }
-    
-    function challengeId() external pure returns (uint256) {
-        return CHALLENGE_ID;
-    }
-    
-    function challengeName() external pure returns (string memory) {
-        return CHALLENGE_NAME;
-    }
-    
-    function difficulty() external pure returns (string memory) {
-        return DIFFICULTY;
-    }
-    
-    function deposit() external payable {
-        balances[msg.sender] += msg.value;
-    }
-    
-    function withdraw(uint256 amount) external {
-        require(balances[msg.sender] >= amount, "Insufficient balance");
-        
-        (bool success, ) = msg.sender.call{value: amount}("");
-        require(success, "Transfer failed");
-        
-        balances[msg.sender] -= amount;
-        
-        if (address(this).balance == 0) {
-            solved = true;
-            emit ChallengeSolved(msg.sender, block.timestamp);
-        }
-    }
-    
-    receive() external payable {
-        deposit();
-    }
-}`
+import WalletConnect from './components/WalletConnect'
+import ChallengeList from './components/ChallengeList'
+import ChallengeInteraction from './components/ChallengeInteraction'
 
 function App() {
-  const handleCompile = (code) => {
-    console.log('Compiling:', code)
-  }
+  const [selectedChallenge, setSelectedChallenge] = useState(null)
 
-  const handleRun = (code) => {
-    console.log('Running:', code)
+  if (selectedChallenge) {
+    return (
+      <div style={styles.app}>
+        <div style={styles.topBar}>
+          <div style={styles.logo}>
+            <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
+            <div style={styles.logoText}>TRIDENT</div>
+          </div>
+          <WalletConnect />
+        </div>
+        <ChallengeInteraction 
+          challenge={selectedChallenge}
+          onBack={() => setSelectedChallenge(null)}
+        />
+      </div>
+    )
   }
 
   return (
-    <CodeEditor 
-      initialCode={initialCode}
-      onCompile={handleCompile}
-      onRun={handleRun}
-    />
+    <div style={styles.app}>
+      <div style={styles.topBar}>
+        <div style={styles.logo}>
+          <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
+          <div style={styles.logoText}>TRIDENT</div>
+        </div>
+        <WalletConnect />
+      </div>
+      <ChallengeList onSelectChallenge={setSelectedChallenge} />
+    </div>
   )
+}
+
+const styles = {
+  app: {
+    minHeight: '100vh',
+    backgroundColor: '#000000',
+    color: '#ffffff',
+    fontFamily: 'monospace',
+  },
+  topBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 24px',
+    backgroundColor: '#ff0000',
+    color: '#000000',
+    borderBottom: '4px solid #000000',
+  },
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  logoAscii: {
+    margin: 0,
+    padding: 0,
+    fontSize: '14px',
+    lineHeight: '1.2',
+    fontFamily: 'monospace',
+    color: '#000000',
+    fontWeight: 'bold',
+  },
+  logoText: {
+    fontSize: '32px',
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    color: '#000000',
+    letterSpacing: '4px',
+  },
 }
 
 export default App
