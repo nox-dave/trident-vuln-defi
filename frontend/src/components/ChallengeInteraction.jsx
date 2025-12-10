@@ -9,12 +9,12 @@ import {
   getChallengeAddress,
   CHALLENGE_ABI,
 } from '../utils/contractHelpers'
-import { CONTRACT_ADDRESSES } from '../config/contracts'
+import { CONTRACT_ADDRESSES, CHALLENGES } from '../config/contracts'
 import { CHALLENGE_DETAILS } from '../config/challengeDetails'
 import { parseAbi, encodeFunctionData } from 'viem'
 import { runTest, loadExploitTemplate } from '../utils/testRunner'
 
-function ChallengeInteraction({ challenge, onBack }) {
+function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
   const { address } = useAccount()
   const config = useConfig()
   const [challengeAddress, setChallengeAddress] = useState(null)
@@ -26,7 +26,9 @@ function ChallengeInteraction({ challenge, onBack }) {
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState(null)
   const [status, setStatus] = useState('')
+  const [statusColor, setStatusColor] = useState('#ffffff')
   const [exploitCode, setExploitCode] = useState('')
+  const [testPassed, setTestPassed] = useState(false)
   const [compiledExploit, setCompiledExploit] = useState(null)
   const [leftPanelWidth, setLeftPanelWidth] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
@@ -49,6 +51,12 @@ function ChallengeInteraction({ challenge, onBack }) {
 
   useEffect(() => {
     if (challenge) {
+      setExploitCode('')
+      setCompiledExploit(null)
+      setTestResult(null)
+      setTestPassed(false)
+      setStatus('')
+      setStatusColor('#ffffff')
       loadTemplate()
     }
   }, [challenge])
@@ -111,8 +119,17 @@ function ChallengeInteraction({ challenge, onBack }) {
 
   const handleCompileExploit = async (code, result) => {
     setExploitCode(code)
+    
+    if (result && result.compilationError) {
+      setStatus(`Compilation error: ${result.compilationError}`)
+      setStatusColor('#ff0000')
+      setCompiledExploit(null)
+      return
+    }
+    
     if (!result) {
       setStatus('Compiling exploit contract...')
+      setStatusColor('#ffffff')
       try {
         const { compileSolidity } = await import('../utils/compiler')
         const compileResult = await compileSolidity(code)
@@ -122,51 +139,211 @@ function ChallengeInteraction({ challenge, onBack }) {
           if (contracts && contracts[contractName]) {
             setCompiledExploit(contracts[contractName])
             setStatus('Exploit contract compiled successfully')
+            setStatusColor('#00ff00')
             return compileResult
           }
         }
         setStatus('Compilation successful but contract not found')
+        setStatusColor('#ff0000')
       } catch (error) {
-        setStatus(`Compilation failed: ${error.message}`)
+        setStatus(`Compilation error: ${error.message}`)
+        setStatusColor('#ff0000')
         throw error
       }
     } else {
+      if (result.errors && result.errors.length > 0) {
+        const errorMessages = result.errors
+          .filter(e => e.severity === 'error')
+          .map(e => e.formattedMessage || e.message)
+          .join('\n')
+        setStatus(`Compilation error: ${errorMessages}`)
+        setStatusColor('#ff0000')
+        setCompiledExploit(null)
+        return
+      }
+      
       const contractName = extractContractName(code)
       if (contractName && result.contracts) {
         const contracts = result.contracts['contract.sol']
         if (contracts && contracts[contractName]) {
           setCompiledExploit(contracts[contractName])
           setStatus('Exploit contract compiled successfully')
+          setStatusColor('#00ff00')
         }
       }
     }
   }
 
-  const handleTestExploit = async () => {
+  const handleTestExploit = async (code, result) => {
+    if (result && result.formattedError) {
+      setStatus(`✗ Browser test FAILED: Test failed\n\n${result.formattedError}`)
+      setStatusColor('#ff0000')
+      setTestResult(result)
+      setTestPassed(false)
+      return
+    }
+
     if (!exploitCode) {
       setStatus('Please write your exploit code first')
+      setStatusColor('#ffffff')
       return
     }
 
     setIsTesting(true)
     setTestResult(null)
     setStatus('Running browser test...')
+    setStatusColor('#ffffff')
 
     try {
-      const result = await runTest(challenge.id, exploitCode)
-      setTestResult(result)
+      const testResult = await runTest(challenge.id, exploitCode)
+      setTestResult(testResult)
       
-      if (result.passed) {
-        setStatus('✓ Browser test PASSED! You can now deploy on-chain.')
+      if (testResult.passed) {
+        const successOutput = formatFoundrySuccess(testResult.output || '')
+        setStatus(`Tests passed\n\n${successOutput}`)
+        setStatusColor('#00ff00')
+        setTestPassed(true)
       } else {
-        setStatus(`✗ Browser test FAILED: ${result.error || 'Test did not pass'}`)
+        setTestPassed(false)
+        const errorOutput = formatFoundryError(testResult.output || testResult.error || 'Test failed')
+        setStatus(`✗ Browser test FAILED: Test failed\n\n${errorOutput}`)
+        setStatusColor('#ff0000')
       }
     } catch (error) {
       setTestResult({ success: false, passed: false, error: error.message })
       setStatus(`Test error: ${error.message}`)
+      setStatusColor('#ff0000')
     } finally {
       setIsTesting(false)
     }
+  }
+
+  const formatFoundrySuccess = (output) => {
+    if (!output) return ''
+    
+    const testMatch = output.match(/(test_\w+)\(\)/i)
+    const contractMatch = output.match(/(\w+Test)/i)
+    const addressMatch = output.match(/0x[a-fA-F0-9]{40}/)
+    const gasMatch = output.match(/(\d+)\s+gas\s+([\d.]+)\s+s/i)
+    const passMatch = output.match(/\[PASS\]|Test result: ok/i)
+    
+    let formatted = ''
+    
+    if (testMatch) {
+      formatted += testMatch[1] + '()\n\n'
+    }
+    
+    if (contractMatch) {
+      formatted += contractMatch[1] + '\n\n'
+    }
+    
+    if (addressMatch) {
+      formatted += 'address\n' + addressMatch[0] + '\n\n'
+    }
+    
+    if (testMatch) {
+      const testName = testMatch[1]
+      formatted += '.\n' + testName + '\n(\n)\n\n'
+    }
+    
+    const rawDataMatch = output.match(/raw data\s+(0x[a-fA-F0-9]+)/i)
+    const selectorMatch = output.match(/selector\s+(0x[a-fA-F0-9]+)/i)
+    
+    if (rawDataMatch) {
+      formatted += 'raw data\n' + rawDataMatch[1] + '\n'
+    }
+    
+    if (selectorMatch) {
+      formatted += 'selector\n' + selectorMatch[1] + '\n'
+    }
+    
+    if (gasMatch) {
+      formatted += '✓\n\n' + gasMatch[1] + ' gas\n' + gasMatch[2] + ' s\n'
+    } else {
+      const simpleGasMatch = output.match(/(\d+)\s+gas/i)
+      const simpleTimeMatch = output.match(/([\d.]+)\s+s/i)
+      if (simpleGasMatch || simpleTimeMatch) {
+        formatted += '✓\n\n'
+        if (simpleGasMatch) {
+          formatted += simpleGasMatch[1] + ' gas\n'
+        }
+        if (simpleTimeMatch) {
+          formatted += simpleTimeMatch[1] + ' s\n'
+        }
+      }
+    }
+    
+    return formatted || output
+  }
+
+  const formatFoundryError = (output) => {
+    if (!output) return 'Test failed'
+    
+    const assertionMatch = output.match(/assertion failed:\s*(\d+)\s*!=\s*(\d+)/i)
+    const testMatch = output.match(/(test_\w+)\(\)/i)
+    const contractMatch = output.match(/(\w+Test)/i)
+    const addressMatch = output.match(/0x[a-fA-F0-9]{40}/)
+    const gasMatch = output.match(/(\d+)\s+gas\s+([\d.]+)\s+s/i)
+    
+    let formatted = ''
+    
+    if (testMatch) {
+      formatted += testMatch[1] + '()\n\n'
+    }
+    
+    if (assertionMatch) {
+      formatted += 'assertion failed: ' + assertionMatch[1] + ' != ' + assertionMatch[2] + '\n\n'
+    }
+    
+    if (contractMatch) {
+      formatted += contractMatch[1] + '\n\n'
+    }
+    
+    if (addressMatch) {
+      formatted += 'address\n' + addressMatch[0] + '\n\n'
+    }
+    
+    if (testMatch) {
+      const testName = testMatch[1]
+      formatted += '.\n' + testName + '\n(\n)\n\n'
+    }
+    
+    if (assertionMatch) {
+      formatted += 'assertion failed: ' + assertionMatch[1] + ' != ' + assertionMatch[2] + '\n\n'
+    }
+    
+    const rawDataMatch = output.match(/raw data\s+(0x[a-fA-F0-9]+)/i)
+    const selectorMatch = output.match(/selector\s+(0x[a-fA-F0-9]+)/i)
+    const rawOutputMatch = output.match(/raw output\s+(0x[a-fA-F0-9.]+)/i)
+    
+    if (rawDataMatch) {
+      formatted += 'raw data\n' + rawDataMatch[1] + '\n'
+    }
+    
+    if (selectorMatch) {
+      formatted += 'selector\n' + selectorMatch[1] + '\n'
+    }
+    
+    if (rawOutputMatch) {
+      formatted += 'raw output\n' + rawOutputMatch[1] + '\n\n'
+    }
+    
+    if (gasMatch) {
+      formatted += '✘\n\n' + gasMatch[1] + ' gas\n' + gasMatch[2] + ' s\n'
+    }
+    
+    if (!formatted) {
+      const errorMatch = output.match(/Error[:\s]+([^\n]+)/i) || 
+                        output.match(/assertion failed[:\s]+([^\n]+)/i)
+      
+      if (errorMatch) {
+        formatted = 'Test failed:\n' + errorMatch[0]
+      } else {
+        formatted = output
+      }
+    }
+    
+    return formatted || output
   }
 
   useEffect(() => {
@@ -326,102 +503,39 @@ function ChallengeInteraction({ challenge, onBack }) {
         />
 
         <div style={{...styles.rightPanel, width: `${100 - leftPanelWidth}%`}}>
-          <div style={styles.stepsContainer}>
-            <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 1: DEPLOY CHALLENGE</div>
-              {challengeAddress ? (
-                <div style={styles.address}>Deployed: {challengeAddress}</div>
-              ) : (
-                <button
-                  style={{...styles.button, opacity: (isDeploying || isDeployPending || isDeployConfirming) ? 0.6 : 1}}
-                  onClick={handleDeployChallenge}
-                  disabled={isDeploying || isDeployPending || isDeployConfirming}
-                >
-                  {(isDeploying || isDeployPending || isDeployConfirming) ? 'DEPLOYING...' : 'DEPLOY CHALLENGE'}
-                </button>
-              )}
-            </div>
-
-            <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 2: WRITE & TEST EXPLOIT (FREE)</div>
               <div style={styles.editorWrapper}>
                 <CodeEditor
                   initialCode={exploitCode}
                   onCompile={handleCompileExploit}
-                  onRun={() => {}}
+              onRun={handleTestExploit}
+              challengeId={challenge.id}
                   compact={true}
                 />
               </div>
-              <div style={styles.testSection}>
-                <button
-                  style={{...styles.testButton, opacity: (isTesting || !exploitCode) ? 0.6 : 1}}
-                  onClick={handleTestExploit}
-                  disabled={isTesting || !exploitCode}
-                >
-                  {isTesting ? 'TESTING...' : '🧪 TEST (FREE)'}
-                </button>
-                {testResult && (
-                  <div style={{
-                    ...styles.testResult,
-                    backgroundColor: testResult.passed ? '#00ff00' : '#ff0000',
-                    color: '#000000'
-                  }}>
-                    {testResult.passed ? '✓ TEST PASSED' : '✗ TEST FAILED'}
-                    {testResult.error && (
-                      <div style={styles.testError}>{testResult.error}</div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
-            <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 3: COMPILE EXPLOIT</div>
-              <div style={styles.hint}>Compile your exploit before deploying on-chain</div>
-            </div>
-
-            <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 4: DEPLOY EXPLOIT (ON-CHAIN)</div>
-              {exploitAddress ? (
-                <div style={styles.address}>Deployed: {exploitAddress}</div>
-              ) : (
-                <button
-                  style={{...styles.button, opacity: (isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming || !compiledExploit) ? 0.6 : 1}}
-                  onClick={handleDeployExploit}
-                  disabled={isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming || !compiledExploit}
-                >
-                  {(isDeployingExploit || isDeployExploitPending || isDeployExploitConfirming) ? 'DEPLOYING...' : 'DEPLOY EXPLOIT'}
-                </button>
-              )}
-            </div>
-
-            <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 5: EXECUTE EXPLOIT (ON-CHAIN)</div>
-              <button
-                style={{...styles.button, opacity: (isExecuting || isExecutePending || isExecuteConfirming || !exploitAddress) ? 0.6 : 1}}
-                onClick={handleExecuteExploit}
-                disabled={isExecuting || isExecutePending || isExecuteConfirming || !exploitAddress}
-              >
-                {(isExecuting || isExecutePending || isExecuteConfirming) ? 'EXECUTING...' : 'EXECUTE EXPLOIT'}
-              </button>
-            </div>
-
-            <div style={styles.stepSection}>
-              <div style={styles.stepTitle}>STEP 6: VERIFY SOLUTION (ON-CHAIN)</div>
-              <button
-                style={{...styles.button, opacity: (isVerifying || isVerifyPending || isVerifyConfirming) ? 0.6 : 1, backgroundColor: '#ff0000'}}
-                onClick={handleVerify}
-                disabled={isVerifying || isVerifyPending || isVerifyConfirming}
-              >
-                {(isVerifying || isVerifyPending || isVerifyConfirming) ? 'VERIFYING...' : 'VERIFY SOLUTION'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {status && (
-        <div style={styles.status}>{status}</div>
+        <div style={{...styles.status, color: statusColor}}>
+          {status}
+          {testPassed && (
+            <div style={styles.nextChallengeContainer}>
+                <button
+                style={styles.nextChallengeButton}
+                onClick={() => {
+                  const nextChallenge = CHALLENGES.find(c => c.id === challenge.id + 1)
+                  if (nextChallenge && onNextChallenge) {
+                    onNextChallenge(nextChallenge)
+                  } else {
+                    onBack()
+                  }
+                }}
+              >
+                Next Challenge
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -485,6 +599,7 @@ const styles = {
     flexDirection: 'column',
     overflow: 'hidden',
     flexShrink: 0,
+    flex: 1,
   },
   stepsContainer: {
     flex: 1,
@@ -521,8 +636,10 @@ const styles = {
     border: '1px solid #ffffff',
   },
   editorWrapper: {
-    height: '500px',
+    height: '100%',
     border: '2px solid #ff0000',
+    display: 'flex',
+    flexDirection: 'column',
   },
   status: {
     padding: '12px 24px',
@@ -532,6 +649,9 @@ const styles = {
     fontFamily: 'monospace',
     color: '#ffffff',
     flexShrink: 0,
+    whiteSpace: 'pre-wrap',
+    maxHeight: '300px',
+    overflow: 'auto',
   },
   testSection: {
     marginTop: '12px',
@@ -567,6 +687,22 @@ const styles = {
     color: '#888888',
     fontStyle: 'italic',
     marginTop: '4px',
+  },
+  nextChallengeContainer: {
+    marginTop: '16px',
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  nextChallengeButton: {
+    backgroundColor: '#00ff00',
+    color: '#000000',
+    border: '2px solid #00ff00',
+    padding: '12px 24px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontFamily: 'monospace',
+    textTransform: 'uppercase',
   },
 }
 

@@ -23,6 +23,7 @@ function App() {
         <ChallengeInteraction 
           challenge={selectedChallenge}
           onBack={() => setSelectedChallenge(null)}
+          onNextChallenge={(nextChallenge) => setSelectedChallenge(nextChallenge)}
         />
       </div>
     )

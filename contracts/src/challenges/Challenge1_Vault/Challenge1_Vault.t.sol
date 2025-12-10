@@ -2,9 +2,9 @@
 pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {EthBankExploit, EthBank} from "../src/challenges/sol-001.sol";
+import {EthBankExploit, EthBank} from "./Challenge1_Vault.sol";
 
-contract EthBankExploitTest is Test {
+contract Challenge1_VaultTest is Test {
     address private constant alice = address(1);
     address private constant bob = address(2);
     address private constant attacker = address(3);
@@ -36,3 +36,4 @@ contract EthBankExploitTest is Test {
         assertEq(address(bank).balance, 0);
     }
 }
+

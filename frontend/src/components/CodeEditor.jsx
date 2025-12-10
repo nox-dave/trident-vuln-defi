@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Editor from '@monaco-editor/react'
 import { compileSolidity, extractContractName } from '../utils/compiler'
+import { runTest } from '../utils/testRunner'
 
-function CodeEditor({ initialCode, onCompile, onRun, compact = false }) {
+function CodeEditor({ initialCode, onCompile, onRun, challengeId, compact = false }) {
   const [code, setCode] = useState(initialCode || '')
   const [output, setOutput] = useState('')
+  const [outputColor, setOutputColor] = useState('#ffffff')
   const [isCompiling, setIsCompiling] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [compiledContract, setCompiledContract] = useState(null)
+  const editorRef = useRef(null)
 
   useEffect(() => {
-    if (initialCode && initialCode !== code) {
+    if (initialCode !== undefined) {
       setCode(initialCode)
     }
   }, [initialCode])
@@ -123,71 +126,178 @@ function CodeEditor({ initialCode, onCompile, onRun, compact = false }) {
     setCode(value || '')
   }
 
+  const handleEditorDidMount = (editor) => {
+    editorRef.current = editor
+  }
+
   const handleCompile = async () => {
     setIsCompiling(true)
     setOutput('Compiling...')
+    setOutputColor('#ffffff')
+    
+    let currentCode = code
+    if (editorRef.current) {
+      currentCode = editorRef.current.getValue() || code
+    }
     
     try {
-      const result = await compileSolidity(code)
+      const result = await compileSolidity(currentCode)
       
       if (result.errors && result.errors.length > 0) {
         const errorMessages = result.errors
           .filter(e => e.severity === 'error')
-          .map(e => `${e.message} (${e.sourceLocation?.file}:${e.sourceLocation?.start}:${e.sourceLocation?.end})`)
+          .map(e => e.formattedMessage || e.message)
           .join('\n')
-        setOutput(`Compilation failed:\n${errorMessages}`)
+        setOutput('')
+        setOutputColor('#ff0000')
         setCompiledContract(null)
+        if (onCompile) {
+          onCompile(currentCode, { ...result, compilationError: errorMessages })
+        }
+        return
       } else {
-        const contractName = extractContractName(code)
+        const contractName = extractContractName(currentCode)
         if (contractName && result.contracts) {
           const contracts = result.contracts['contract.sol']
           if (contracts && contracts[contractName]) {
             setCompiledContract(contracts[contractName])
-            setOutput(`Compilation successful!\nContract: ${contractName}\nABI: ${JSON.stringify(contracts[contractName].abi, null, 2).substring(0, 200)}...`)
+            setOutput('')
+            setOutputColor('#00ff00')
           } else {
             setOutput('Compilation successful but contract not found in output')
+            setOutputColor('#ff0000')
           }
         } else {
-          setOutput('Compilation successful')
+          setOutput('')
+          setOutputColor('#00ff00')
         }
       }
       
       if (onCompile) {
-        onCompile(code, result)
+        onCompile(currentCode, result)
       }
     } catch (error) {
-      setOutput(`Compilation error: ${error.message}`)
+      setOutput('')
+      setOutputColor('#ff0000')
       setCompiledContract(null)
+      if (onCompile) {
+        onCompile(currentCode, { compilationError: error.message })
+      }
     } finally {
       setIsCompiling(false)
     }
   }
 
   const handleRun = async () => {
-    if (!compiledContract) {
-      setOutput('Please compile the contract first')
+    let currentCode = code
+    if (editorRef.current) {
+      currentCode = editorRef.current.getValue() || code
+    }
+    
+    if (!currentCode || !challengeId) {
+      setOutput('Please write your exploit code first')
       return
     }
     
     setIsRunning(true)
-    setOutput('Running contract...')
+    setOutput('')
     
     try {
-      if (onRun) {
-        await onRun(code, compiledContract)
-        setOutput('Contract executed successfully')
+      const result = await runTest(challengeId, currentCode)
+      
+      if (result.passed) {
+        setOutput('')
       } else {
-        setOutput('Run handler not configured')
+        setOutput('')
+        const errorOutput = formatFoundryError(result.output || result.error || 'Test failed')
+        if (onRun) {
+          onRun(currentCode, { ...result, formattedError: errorOutput })
+        }
+        return
+      }
+      
+      if (onRun) {
+        onRun(currentCode, result)
       }
     } catch (error) {
-      setOutput(`Execution error: ${error.message}`)
+      setOutput('')
     } finally {
       setIsRunning(false)
     }
   }
 
+  const formatFoundryError = (output) => {
+    if (!output) return 'Test failed'
+    
+    const assertionMatch = output.match(/assertion failed:\s*(\d+)\s*!=\s*(\d+)/i)
+    const testMatch = output.match(/(test_\w+)\(\)/i)
+    const contractMatch = output.match(/(\w+Test)/i)
+    const addressMatch = output.match(/0x[a-fA-F0-9]{40}/)
+    const gasMatch = output.match(/(\d+)\s+gas\s+([\d.]+)\s+s/i)
+    
+    let formatted = ''
+    
+    if (testMatch) {
+      formatted += testMatch[1] + '()\n\n'
+    }
+    
+    if (assertionMatch) {
+      formatted += 'assertion failed: ' + assertionMatch[1] + ' != ' + assertionMatch[2] + '\n\n'
+    }
+    
+    if (contractMatch) {
+      formatted += contractMatch[1] + '\n\n'
+    }
+    
+    if (addressMatch) {
+      formatted += 'address\n' + addressMatch[0] + '\n\n'
+    }
+    
+    if (testMatch) {
+      const testName = testMatch[1]
+      formatted += '.\n' + testName + '\n(\n)\n\n'
+    }
+    
+    if (assertionMatch) {
+      formatted += 'assertion failed: ' + assertionMatch[1] + ' != ' + assertionMatch[2] + '\n\n'
+    }
+    
+    const rawDataMatch = output.match(/raw data\s+(0x[a-fA-F0-9]+)/i)
+    const selectorMatch = output.match(/selector\s+(0x[a-fA-F0-9]+)/i)
+    const rawOutputMatch = output.match(/raw output\s+(0x[a-fA-F0-9.]+)/i)
+    
+    if (rawDataMatch) {
+      formatted += 'raw data\n' + rawDataMatch[1] + '\n'
+    }
+    
+    if (selectorMatch) {
+      formatted += 'selector\n' + selectorMatch[1] + '\n'
+    }
+    
+    if (rawOutputMatch) {
+      formatted += 'raw output\n' + rawOutputMatch[1] + '\n\n'
+    }
+    
+    if (gasMatch) {
+      formatted += '✘\n\n' + gasMatch[1] + ' gas\n' + gasMatch[2] + ' s\n'
+    }
+    
+    if (!formatted) {
+      const errorMatch = output.match(/Error[:\s]+([^\n]+)/i) || 
+                        output.match(/assertion failed[:\s]+([^\n]+)/i)
+      
+      if (errorMatch) {
+        formatted = 'Test failed:\n' + errorMatch[0]
+      } else {
+        formatted = output
+      }
+    }
+    
+    return formatted || output
+  }
+
   return (
-    <div style={{...styles.container, height: compact ? '100%' : '100vh'}}>
+    <div style={{...styles.container, height: '100%', display: 'flex', flexDirection: 'column'}}>
       {!compact && (
         <div style={styles.topHeader}>
           <div style={styles.tridentLogo}>
@@ -212,9 +322,9 @@ function CodeEditor({ initialCode, onCompile, onRun, compact = false }) {
             ⚙ {isCompiling ? 'COMPILING...' : 'COMPILE'}
           </button>
           <button 
-            style={{...styles.runButton, opacity: isRunning || !compiledContract ? 0.6 : 1}} 
+            style={{...styles.runButton, opacity: isRunning || !code ? 0.6 : 1}} 
             onClick={handleRun}
-            disabled={isRunning || !compiledContract}
+            disabled={isRunning || !code}
           >
             ▶ {isRunning ? 'RUNNING...' : 'RUN'}
           </button>
@@ -227,6 +337,7 @@ function CodeEditor({ initialCode, onCompile, onRun, compact = false }) {
           defaultLanguage="solidity"
           value={code}
           onChange={handleEditorChange}
+          onMount={handleEditorDidMount}
           theme="brutalist"
           beforeMount={handleEditorWillMount}
           options={{
@@ -253,7 +364,7 @@ function CodeEditor({ initialCode, onCompile, onRun, compact = false }) {
       
       {output && (
         <div style={styles.output}>
-          <pre style={styles.outputText}>{output}</pre>
+          <pre style={{...styles.outputText, color: outputColor}}>{output}</pre>
         </div>
       )}
     </div>
