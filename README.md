@@ -1,4 +1,15 @@
-# Trident: A Vulnerable DeFi Playground
+<div align="center">
+
+```
+┌─────┼─────┐
+▼     ▼     ▼
+```
+
+# **TRIDENT**
+
+### A Vulnerable DeFi Playground
+
+</div>
 
 A Vulnerable DeFi Playground for OffensiveSecurityDAO - An educational platform teaching smart contract security through hands-on exploitation of intentionally vulnerable contracts.
 

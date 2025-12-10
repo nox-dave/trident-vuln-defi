@@ -1,11 +1,46 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 export default function WalletConnect() {
   const { address, isConnected } = useAccount()
-  const { connect, connectors, isPending } = useConnect()
+  const { connect, connectors, isPending, error } = useConnect()
   const { disconnect } = useDisconnect()
+  const [errorMessage, setErrorMessage] = useState('')
+  const connectingRef = useRef(false)
 
-  const metaMaskConnector = connectors.find(c => c.id === 'metaMask')
+  const metaMaskConnector = connectors[0]
+
+  useEffect(() => {
+    if (error) {
+      setErrorMessage(error.message)
+      connectingRef.current = false
+    } else {
+      setErrorMessage('')
+    }
+  }, [error])
+
+  useEffect(() => {
+    if (isConnected) {
+      connectingRef.current = false
+    }
+  }, [isConnected])
+
+  const handleConnect = useCallback(() => {
+    if (connectingRef.current || isPending || isConnected) {
+      return
+    }
+    
+    connectingRef.current = true
+    setErrorMessage('')
+    
+    if (!metaMaskConnector) {
+      setErrorMessage('MetaMask not found. Please install MetaMask extension.')
+      connectingRef.current = false
+      return
+    }
+    
+    connect({ connector: metaMaskConnector })
+  }, [connect, metaMaskConnector, isPending, isConnected])
 
   if (isConnected) {
     return (
@@ -21,19 +56,33 @@ export default function WalletConnect() {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={styles.wrapper}>
       <button
-        style={{...styles.connectButton, opacity: isPending ? 0.6 : 1}}
-        onClick={() => metaMaskConnector && connect({ connector: metaMaskConnector })}
-        disabled={isPending || !metaMaskConnector}
+        style={{...styles.connectButton, opacity: (isPending || connectingRef.current) ? 0.6 : 1}}
+        onClick={handleConnect}
+        disabled={isPending || !metaMaskConnector || connectingRef.current}
       >
-        {isPending ? 'CONNECTING...' : 'CONNECT METAMASK'}
+        {(isPending || connectingRef.current) ? 'CONNECTING...' : 'CONNECT WALLET'}
       </button>
+      {errorMessage && (
+        <div style={styles.error}>{errorMessage}</div>
+      )}
+      {!metaMaskConnector && connectors.length > 0 && (
+        <div style={styles.error}>
+          MetaMask connector not found. Available: {connectors.map(c => c.name || c.id).join(', ')}
+        </div>
+      )}
     </div>
   )
 }
 
 const styles = {
+  wrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '4px',
+  },
   container: {
     display: 'flex',
     alignItems: 'center',
@@ -42,13 +91,14 @@ const styles = {
   connectButton: {
     backgroundColor: '#ff0000',
     color: '#000000',
-    border: '2px solid #ff0000',
-    padding: '8px 16px',
-    fontSize: '12px',
+    border: '2px solid #000000',
+    padding: '12px 24px',
+    fontSize: '14px',
     fontWeight: 'bold',
     cursor: 'pointer',
     fontFamily: 'monospace',
     textTransform: 'uppercase',
+    outline: 'none',
   },
   address: {
     color: '#000000',
@@ -68,5 +118,12 @@ const styles = {
     cursor: 'pointer',
     fontFamily: 'monospace',
     textTransform: 'uppercase',
+  },
+  error: {
+    fontSize: '10px',
+    color: '#ff0000',
+    fontFamily: 'monospace',
+    textAlign: 'right',
+    maxWidth: '200px',
   },
 }
