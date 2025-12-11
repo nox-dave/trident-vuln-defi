@@ -200,9 +200,41 @@ function CodeEditor({ initialCode, onCompile, onRun, challengeId, compact = fals
     }
     
     setIsRunning(true)
-    setOutput('')
+    setOutput('Compiling...')
+    setOutputColor('#ffffff')
     
     try {
+      const compileResult = await compileSolidity(currentCode)
+      
+      if (compileResult.errors && compileResult.errors.length > 0) {
+        const errorMessages = compileResult.errors
+          .filter(e => e.severity === 'error')
+          .map(e => e.formattedMessage || e.message)
+          .join('\n')
+        setOutput('')
+        setOutputColor('#ff0000')
+        if (onCompile) {
+          onCompile(currentCode, { ...compileResult, compilationError: errorMessages })
+        }
+        setIsRunning(false)
+        return
+      }
+      
+      const contractName = extractContractName(currentCode)
+      if (contractName && compileResult.contracts) {
+        const contracts = compileResult.contracts['contract.sol']
+        if (contracts && contracts[contractName]) {
+          setCompiledContract(contracts[contractName])
+        }
+      }
+      
+      if (onCompile) {
+        onCompile(currentCode, compileResult)
+      }
+      
+      setOutput('Running test...')
+      setOutputColor('#ffffff')
+      
       const result = await runTest(challengeId, currentCode)
       
       if (result.passed) {
@@ -221,6 +253,16 @@ function CodeEditor({ initialCode, onCompile, onRun, challengeId, compact = fals
       }
     } catch (error) {
       setOutput('')
+      setOutputColor('#ff0000')
+      if (error.message && error.message.includes('compilation')) {
+        if (onCompile) {
+          onCompile(currentCode, { compilationError: error.message })
+        }
+      } else {
+        if (onRun) {
+          onRun(currentCode, { success: false, passed: false, error: error.message })
+        }
+      }
     } finally {
       setIsRunning(false)
     }
