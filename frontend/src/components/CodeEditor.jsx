@@ -357,13 +357,6 @@ function CodeEditor({ initialCode, onCompile, onRun, challengeId, compact = fals
             &lt;/&gt; FORMAT
           </button>
           <button 
-            style={{...styles.compileButton, opacity: isCompiling ? 0.6 : 1}} 
-            onClick={handleCompile}
-            disabled={isCompiling}
-          >
-            ⚙ {isCompiling ? 'COMPILING...' : 'COMPILE'}
-          </button>
-          <button 
             style={{...styles.runButton, opacity: isRunning || !code ? 0.6 : 1}} 
             onClick={handleRun}
             disabled={isRunning || !code}

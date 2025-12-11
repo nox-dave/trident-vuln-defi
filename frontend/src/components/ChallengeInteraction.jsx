@@ -183,19 +183,21 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
       return
     }
 
-    if (!exploitCode) {
+    const codeToTest = code || exploitCode
+    if (!codeToTest) {
       setStatus('Please write your exploit code first')
       setStatusColor('#ffffff')
       return
     }
 
+    setExploitCode(codeToTest)
     setIsTesting(true)
     setTestResult(null)
     setStatus('Running browser test...')
     setStatusColor('#ffffff')
 
     try {
-      const testResult = await runTest(challenge.id, exploitCode)
+      const testResult = await runTest(challenge.id, codeToTest)
       setTestResult(testResult)
       
       if (testResult.passed) {
