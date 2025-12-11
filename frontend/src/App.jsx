@@ -10,9 +10,7 @@ function App() {
     setSelectedChallenge(null)
   }
 
-  if (selectedChallenge) {
-    return (
-      <div style={styles.app}>
+  const TopBar = () => (
         <div style={styles.topBar}>
           <div style={styles.logo} onClick={handleLogoClick}>
             <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
@@ -20,6 +18,12 @@ function App() {
           </div>
           <WalletConnect />
         </div>
+  )
+
+  if (selectedChallenge) {
+    return (
+      <div style={styles.app}>
+        <TopBar />
         <ChallengeInteraction 
           challenge={selectedChallenge}
           onBack={() => setSelectedChallenge(null)}
@@ -31,13 +35,7 @@ function App() {
 
   return (
     <div style={styles.app}>
-      <div style={styles.topBar}>
-        <div style={styles.logo} onClick={handleLogoClick}>
-          <pre style={styles.logoAscii}>     ┌─────┼─────┐{'\n'}     ▼     ▼     ▼</pre>
-          <div style={styles.logoText}>TRIDENT</div>
-        </div>
-        <WalletConnect />
-      </div>
+      <TopBar />
       <ChallengeList onSelectChallenge={setSelectedChallenge} />
     </div>
   )

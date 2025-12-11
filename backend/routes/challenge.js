@@ -12,8 +12,6 @@ router.get('/:id/template',
   validateChallengeId,
   asyncHandler(async (req, res) => {
     const challengeId = req.params.id;
-    log.info('📄', `Template request for challenge ${challengeId}`);
-    
     const result = await challengeService.getTemplate(challengeId);
     res.json(result);
   })
@@ -23,8 +21,6 @@ router.get('/:id/info',
   validateChallengeId,
   asyncHandler(async (req, res) => {
     const challengeId = req.params.id;
-    log.info('ℹ️', `Info request for challenge ${challengeId}`);
-    
     const result = await challengeService.getChallengeInfo(challengeId);
     res.json(result);
   })

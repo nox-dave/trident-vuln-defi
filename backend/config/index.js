@@ -19,6 +19,22 @@ export const config = {
     3: 'Challenge3_Token',
     4: 'Challenge4_Lottery',
     5: 'Challenge5_Proxy',
+  },
+  network: process.env.NETWORK || 'polygonAmoy',
+  polygonAmoy: {
+    rpcUrl: process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology',
+    challengeFactoryAddress: process.env.POLYGON_AMOY_CHALLENGE_FACTORY_ADDRESS || '',
+    privateKey: process.env.POLYGON_AMOY_PRIVATE_KEY || process.env.PRIVATE_KEY || '',
+  },
+  baseSepolia: {
+    rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
+    challengeFactoryAddress: process.env.BASE_SEPOLIA_CHALLENGE_FACTORY_ADDRESS || '',
+    privateKey: process.env.BASE_SEPOLIA_PRIVATE_KEY || process.env.SEPOLIA_PRIVATE_KEY || '',
+  },
+  sepolia: {
+    rpcUrl: process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+    challengeFactoryAddress: process.env.SEPOLIA_CHALLENGE_FACTORY_ADDRESS || '',
+    privateKey: process.env.SEPOLIA_PRIVATE_KEY || '',
   }
 };
 

@@ -22,11 +22,25 @@ chain_id = 11155111
 eth_rpc_url = "${SEPOLIA_RPC_URL}"
 private_key = "${PRIVATE_KEY}"
 
+[profile.baseSepolia]
+chain_id = 84532
+eth_rpc_url = "${BASE_SEPOLIA_RPC_URL}"
+private_key = "${PRIVATE_KEY}"
+
+[profile.polygonAmoy]
+chain_id = 80002
+eth_rpc_url = "${POLYGON_AMOY_RPC_URL}"
+private_key = "${PRIVATE_KEY}"
+
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
+baseSepolia = "${BASE_SEPOLIA_RPC_URL}"
+polygonAmoy = "${POLYGON_AMOY_RPC_URL}"
 
 [etherscan]
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
+baseSepolia = { key = "${BASESCAN_API_KEY}" }
+polygonAmoy = { key = "${POLYGONSCAN_API_KEY}" }
 
 [fmt]
 line_length = 80

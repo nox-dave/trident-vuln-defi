@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { mkdir } from 'fs/promises';
@@ -33,7 +34,6 @@ async function startServer() {
     
     app.listen(config.port, () => {
       log.info('🚀', `Server running on port ${config.port}`);
-      log.info('📁', `Contracts directory: ${config.contractsDir}`);
     });
   } catch (error) {
     log.error('❌', 'Failed to start server:', error);

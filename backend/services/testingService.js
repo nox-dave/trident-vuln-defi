@@ -46,25 +46,15 @@ export class TestingService {
 
     const exploitContractOnly = extractExploitContractFromUserCode(exploitCode, exploitContractName);
     if (!exploitContractOnly) {
-      log.error('❌', 'Failed to extract contract. User code:', exploitCode.substring(0, 500));
+      log.error('❌', 'Failed to extract contract from user code');
       throw new Error('Could not extract exploit contract from user code. Make sure your contract is properly formatted with matching braces.');
     }
     
-    log.info('📝', 'Extracted contract (full):', exploitContractOnly);
     const openBraces = (exploitContractOnly.match(/\{/g) || []).length;
     const closeBraces = (exploitContractOnly.match(/\}/g) || []).length;
-    log.info('🔍', `Brace count - Open: ${openBraces}, Close: ${closeBraces}`);
     
     if (openBraces !== closeBraces) {
       throw new Error(`Extracted contract has mismatched braces. Found ${openBraces} opening braces and ${closeBraces} closing braces. Please ensure all functions have matching opening and closing braces.`);
-    }
-    
-    if (!exploitContractOnly.includes('receive()') && !exploitContractOnly.includes('receive ()')) {
-      log.warn('⚠️', 'Warning: Extracted contract does not appear to have a receive() function');
-    }
-    
-    if (!exploitContractOnly.includes('function pwn()')) {
-      log.warn('⚠️', 'Warning: Extracted contract does not appear to have a pwn() function');
     }
 
     const updatedChallengeContent = replaceExploitContract(challengeContent, exploitContractOnly, exploitContractName);

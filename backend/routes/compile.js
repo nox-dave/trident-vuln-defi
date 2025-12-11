@@ -13,7 +13,6 @@ router.post('/compile',
   validateCompileRequest,
   asyncHandler(async (req, res) => {
     const { code } = req.body;
-    log.info('🔨', 'Compilation request received');
     
     await mkdir(config.tempDir, { recursive: true }).catch(() => {});
     

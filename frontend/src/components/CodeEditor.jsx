@@ -353,9 +353,6 @@ function CodeEditor({ initialCode, onCompile, onRun, challengeId, compact = fals
           <span style={styles.solidityBadge}>SOLIDITY 0.8.30</span>
         </div>
         <div style={styles.headerRight}>
-          <button style={styles.formatButton} onClick={() => {}}>
-            &lt;/&gt; FORMAT
-          </button>
           <button 
             style={{...styles.runButton, opacity: isRunning || !code ? 0.6 : 1}} 
             onClick={handleRun}

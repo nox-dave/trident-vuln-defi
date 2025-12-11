@@ -5,14 +5,13 @@ import CodeEditor from './CodeEditor'
 import ChallengeDetailsPanel from './ChallengeDetailsPanel'
 import {
   deployChallenge,
-  verifySolution,
   getChallengeAddress,
   CHALLENGE_ABI,
 } from '../utils/contractHelpers'
 import { CONTRACT_ADDRESSES, CHALLENGES } from '../config/contracts'
 import { CHALLENGE_DETAILS } from '../config/challengeDetails'
 import { parseAbi, encodeFunctionData } from 'viem'
-import { runTest, loadExploitTemplate } from '../utils/testRunner'
+import { runTest, loadExploitTemplate, verifyOnSepolia } from '../utils/testRunner'
 
 function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
   const { address } = useAccount()
@@ -32,14 +31,13 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
   const [compiledExploit, setCompiledExploit] = useState(null)
   const [leftPanelWidth, setLeftPanelWidth] = useState(50)
   const [isResizing, setIsResizing] = useState(false)
+  const [verificationStatus, setVerificationStatus] = useState(null)
 
   const { writeContract: deployChallengeWrite, data: deployHash, isPending: isDeployPending } = useWriteContract()
-  const { writeContract: verifyWrite, data: verifyHash, isPending: isVerifyPending } = useWriteContract()
   const { writeContract: executeWrite, data: executeHash, isPending: isExecutePending } = useWriteContract()
   const { writeContract: deployExploitWrite, data: deployExploitHash, isPending: isDeployExploitPending } = useWriteContract()
 
   const { isLoading: isDeployConfirming } = useWaitForTransactionReceipt({ hash: deployHash })
-  const { isLoading: isVerifyConfirming } = useWaitForTransactionReceipt({ hash: verifyHash })
   const { isLoading: isExecuteConfirming } = useWaitForTransactionReceipt({ hash: executeHash })
   const { data: deployExploitReceipt, isLoading: isDeployExploitConfirming } = useWaitForTransactionReceipt({ hash: deployExploitHash })
 
@@ -415,33 +413,37 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
     }
   }, [executeHash, isExecuteConfirming])
 
-  const handleVerify = async () => {
-    if (!address || !challengeAddress) {
-      setStatus('Please connect wallet and deploy challenge')
+  const handleVerifyOnSepolia = async () => {
+    if (!address) {
+      setStatus('Please connect wallet to verify on-chain')
+      setStatusColor('#ff0000')
       return
     }
 
     setIsVerifying(true)
-    setStatus('Verifying solution...')
+    setVerificationStatus(null)
+    setStatus('Verifying on-chain...')
+    setStatusColor('#ffff00')
+    
     try {
-      verifyWrite({
-        address: CONTRACT_ADDRESSES.CHALLENGE_FACTORY,
-        abi: parseAbi(['function verifyAndRecord(address user, uint256 challengeId) external']),
-        functionName: 'verifyAndRecord',
-        args: [address, BigInt(challenge.id)],
-      })
+      const result = await verifyOnSepolia(challenge.id, address)
+      setVerificationStatus(result)
+      
+      if (result.verified) {
+        setStatus(`✅ Verified on-chain!\nTransaction: ${result.transactionHash}\nBlock: ${result.blockNumber}`)
+        setStatusColor('#00ff00')
+      } else {
+        setStatus(`⚠️ Verification failed: ${result.error || 'Unknown error'}`)
+        setStatusColor('#ff0000')
+      }
     } catch (error) {
-      setStatus(`Verification failed: ${error.message}`)
+      setStatus(`Verification error: ${error.message}`)
+      setStatusColor('#ff0000')
+      setVerificationStatus({ success: false, verified: false, error: error.message })
+    } finally {
       setIsVerifying(false)
     }
   }
-
-  useEffect(() => {
-    if (verifyHash && !isVerifyConfirming) {
-      setStatus('Solution verified! Challenge completed.')
-      setIsVerifying(false)
-    }
-  }, [verifyHash, isVerifyConfirming])
 
   const extractContractName = (code) => {
     const match = code.match(/contract\s+(\w+)/)
@@ -522,6 +524,13 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
           {status}
           {testPassed && (
             <div style={styles.nextChallengeContainer}>
+              <button
+                style={styles.verifyButton}
+                onClick={handleVerifyOnSepolia}
+                disabled={isVerifying}
+              >
+                {isVerifying ? 'Verifying...' : 'Verify on-chain'}
+              </button>
                 <button
                 style={styles.nextChallengeButton}
                 onClick={() => {
@@ -694,6 +703,18 @@ const styles = {
     marginTop: '16px',
     display: 'flex',
     justifyContent: 'center',
+    gap: '12px',
+  },
+  verifyButton: {
+    backgroundColor: '#ffff00',
+    color: '#000000',
+    border: '2px solid #ffff00',
+    padding: '12px 24px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    fontFamily: 'monospace',
+    textTransform: 'uppercase',
   },
   nextChallengeButton: {
     backgroundColor: '#00ff00',

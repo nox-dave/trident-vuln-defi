@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export async function runTest(challengeId, exploitCode) {
+export async function runTest(challengeId, exploitCode, userAddress = null) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/test`, {
       method: 'POST',
@@ -10,6 +10,7 @@ export async function runTest(challengeId, exploitCode) {
       body: JSON.stringify({
         challengeId: String(challengeId),
         exploitCode,
+        userAddress,
       }),
     });
 
@@ -37,6 +38,30 @@ export async function loadExploitTemplate(challengeId) {
   } catch (error) {
     console.error('Failed to load template:', error);
     return null;
+  }
+}
+
+export async function verifyOnSepolia(challengeId, userAddress) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        challengeId: String(challengeId),
+        userAddress,
+      }),
+    });
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      verified: false,
+      error: error.message || 'Failed to connect to verification server',
+    };
   }
 }
 
