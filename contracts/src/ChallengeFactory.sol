@@ -5,10 +5,16 @@ import "./IChallenge.sol";
 import "./ProgressTracker.sol";
 
 contract ChallengeFactory {
-    ProgressTracker public progressTracker;
+    ProgressTracker public immutable progressTracker;
     mapping(uint256 => address) public challengeAddresses;
     mapping(uint256 => address) public challengeImplementations;
     address public owner;
+
+    error Unauthorized();
+    error ImplementationNotSet();
+    error ChallengeAlreadyDeployed();
+    error ChallengeNotDeployed();
+    error ChallengeNotSolved();
 
     event ChallengeDeployed(uint256 indexed challengeId, address indexed challengeAddress);
     event ChallengeVerified(address indexed user, uint256 indexed challengeId);
@@ -19,19 +25,23 @@ contract ChallengeFactory {
     }
 
     function setChallengeImplementation(uint256 challengeId, address implementation) external {
-        require(msg.sender == owner, "Unauthorized");
+        if (msg.sender != owner) revert Unauthorized();
         challengeImplementations[challengeId] = implementation;
     }
 
+    function updateChallengeAddress(uint256 challengeId, address newAddress) external {
+        if (msg.sender != owner) revert Unauthorized();
+        challengeAddresses[challengeId] = newAddress;
+    }
+
     function deployChallenge(uint256 challengeId) external returns (address) {
-        require(challengeImplementations[challengeId] != address(0), "Implementation not set");
-        require(challengeAddresses[challengeId] == address(0), "Challenge already deployed");
+        address implementation = challengeImplementations[challengeId];
+        if (implementation == address(0)) revert ImplementationNotSet();
+        if (challengeAddresses[challengeId] != address(0)) revert ChallengeAlreadyDeployed();
 
-        address challengeAddress = challengeImplementations[challengeId];
-        challengeAddresses[challengeId] = challengeAddress;
-
-        emit ChallengeDeployed(challengeId, challengeAddress);
-        return challengeAddress;
+        challengeAddresses[challengeId] = implementation;
+        emit ChallengeDeployed(challengeId, implementation);
+        return implementation;
     }
 
     function getChallengeAddress(uint256 challengeId) external view returns (address) {
@@ -40,13 +50,12 @@ contract ChallengeFactory {
 
     function verifyAndRecord(address user, uint256 challengeId) external {
         address challengeAddress = challengeAddresses[challengeId];
-        require(challengeAddress != address(0), "Challenge not deployed");
+        if (challengeAddress == address(0)) revert ChallengeNotDeployed();
 
         IChallenge challenge = IChallenge(challengeAddress);
-        require(challenge.isSolved(), "Challenge not solved");
+        if (!challenge.isSolved()) revert ChallengeNotSolved();
 
         progressTracker.recordSolution(user, challengeId);
         emit ChallengeVerified(user, challengeId);
     }
 }
-

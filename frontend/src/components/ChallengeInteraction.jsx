@@ -8,7 +8,7 @@ import {
   getChallengeAddress,
   CHALLENGE_ABI,
 } from '../utils/contractHelpers'
-import { CONTRACT_ADDRESSES, CHALLENGES } from '../config/contracts'
+import { CONTRACT_ADDRESSES, CHALLENGES, DEPLOYED_CHALLENGES } from '../config/contracts'
 import { CHALLENGE_DETAILS } from '../config/challengeDetails'
 import { parseAbi, encodeFunctionData } from 'viem'
 import { runTest, loadExploitTemplate, verifyOnSepolia } from '../utils/testRunner'
@@ -72,17 +72,35 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
 
   const loadChallengeAddress = async () => {
     try {
-      if (!CONTRACT_ADDRESSES.CHALLENGE_FACTORY) return
-      const address = await getChallengeAddress(
-        config,
-        CONTRACT_ADDRESSES.CHALLENGE_FACTORY,
-        challenge.id
-      )
+      let address = null
+      
+      if (CONTRACT_ADDRESSES.CHALLENGE_FACTORY) {
+        try {
+          address = await getChallengeAddress(
+            config,
+            CONTRACT_ADDRESSES.CHALLENGE_FACTORY,
+            challenge.id
+          )
+        } catch (error) {
+          console.log('Could not load from factory, trying deployed address:', error)
+        }
+      }
+      
+      if (!address || address === '0x0000000000000000000000000000000000000000') {
+        if (DEPLOYED_CHALLENGES[challenge.id]) {
+          address = DEPLOYED_CHALLENGES[challenge.id]
+          console.log(`Using deployed challenge address for challenge ${challenge.id}:`, address)
+        }
+      }
+      
       if (address && address !== '0x0000000000000000000000000000000000000000') {
         setChallengeAddress(address)
       }
     } catch (error) {
       console.error('Failed to load challenge address:', error)
+      if (DEPLOYED_CHALLENGES[challenge.id]) {
+        setChallengeAddress(DEPLOYED_CHALLENGES[challenge.id])
+      }
     }
   }
 

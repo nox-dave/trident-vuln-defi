@@ -2,21 +2,27 @@
 pragma solidity 0.8.30;
 
 contract ProgressTracker {
-    address public factory;
+    address public immutable factory;
     mapping(address => mapping(uint256 => bool)) private solved;
-    mapping(address => uint256[]) private solvedChallenges;
     mapping(address => uint256) private solvedCount;
 
-    constructor() {
-        factory = msg.sender;
+    error Unauthorized();
+
+    event ChallengeSolved(
+        address indexed user,
+        uint256 indexed challengeId,
+        uint256 timestamp
+    );
+
+    constructor(address _factory) {
+        factory = _factory;
     }
 
-    function hasSolved(address user, uint256 challengeId) external view returns (bool) {
+    function hasSolved(
+        address user,
+        uint256 challengeId
+    ) external view returns (bool) {
         return solved[user][challengeId];
-    }
-
-    function getSolvedChallenges(address user) external view returns (uint256[] memory) {
-        return solvedChallenges[user];
     }
 
     function getSolvedCount(address user) external view returns (uint256) {
@@ -24,13 +30,14 @@ contract ProgressTracker {
     }
 
     function recordSolution(address user, uint256 challengeId) external {
-        require(msg.sender == factory, "Unauthorized");
-        
+        if (msg.sender != factory) revert Unauthorized();
+
         if (!solved[user][challengeId]) {
             solved[user][challengeId] = true;
-            solvedChallenges[user].push(challengeId);
-            solvedCount[user]++;
+            unchecked {
+                solvedCount[user]++;
+            }
+            emit ChallengeSolved(user, challengeId, block.timestamp);
         }
     }
 }
-

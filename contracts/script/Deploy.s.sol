@@ -10,10 +10,16 @@ contract Deploy is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        ProgressTracker progressTracker = new ProgressTracker();
+        address deployerAddress = vm.addr(deployerPrivateKey);
+        uint256 currentNonce = vm.getNonce(deployerAddress);
+        address factoryAddress = vm.computeCreateAddress(deployerAddress, currentNonce + 1);
+        
+        ProgressTracker progressTracker = new ProgressTracker(factoryAddress);
         ChallengeFactory factory = new ChallengeFactory(
             address(progressTracker)
         );
+
+        require(address(factory) == factoryAddress, "Factory address mismatch");
 
         console.log("ProgressTracker deployed at:", address(progressTracker));
         console.log("ChallengeFactory deployed at:", address(factory));

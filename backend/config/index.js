@@ -23,8 +23,9 @@ export const config = {
   network: process.env.NETWORK || 'polygonAmoy',
   polygonAmoy: {
     rpcUrl: process.env.POLYGON_AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology',
-    challengeFactoryAddress: process.env.POLYGON_AMOY_CHALLENGE_FACTORY_ADDRESS || '',
+    challengeFactoryAddress: process.env.POLYGON_AMOY_CHALLENGE_FACTORY_ADDRESS || '0xdB51e44657D578BA9b8Bf48C6fD7F7200884Fb66',
     privateKey: process.env.POLYGON_AMOY_PRIVATE_KEY || process.env.PRIVATE_KEY || '',
+    progressTrackerAddress: process.env.POLYGON_AMOY_PROGRESS_TRACKER_ADDRESS || '0x2B85A7801d11397DfCF28539841da379803E6da7',
   },
   baseSepolia: {
     rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',

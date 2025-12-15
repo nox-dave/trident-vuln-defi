@@ -10,7 +10,6 @@ export default function WalletConnect() {
   const connectingRef = useRef(false)
 
   const metaMaskConnector = connectors.find(c => c.id === 'metaMask' || c.name === 'MetaMask')
-  const coinbaseConnector = connectors.find(c => c.id === 'coinbaseWallet' || c.name === 'Coinbase Wallet')
 
   const getChainName = (id) => {
     const chains = {
@@ -71,32 +70,19 @@ export default function WalletConnect() {
 
   return (
     <div style={styles.wrapper}>
-      <div style={styles.buttonGroup}>
-        {metaMaskConnector && (
-          <button
-            style={{...styles.connectButton, opacity: (isPending || connectingRef.current) ? 0.6 : 1}}
-            onClick={() => handleConnect(metaMaskConnector)}
-            disabled={isPending || connectingRef.current}
-          >
-            {(isPending || connectingRef.current) ? 'CONNECTING...' : 'METAMASK'}
-          </button>
-        )}
-        {coinbaseConnector && (
-          <button
-            style={{...styles.connectButton, opacity: (isPending || connectingRef.current) ? 0.6 : 1}}
-            onClick={() => handleConnect(coinbaseConnector)}
-            disabled={isPending || connectingRef.current}
-          >
-            {(isPending || connectingRef.current) ? 'CONNECTING...' : 'COINBASE'}
-          </button>
-        )}
-      </div>
+      <button
+        style={{...styles.connectButton, opacity: (isPending || connectingRef.current) ? 0.6 : 1}}
+        onClick={() => handleConnect(metaMaskConnector)}
+        disabled={isPending || !metaMaskConnector || connectingRef.current}
+      >
+        {(isPending || connectingRef.current) ? 'CONNECTING...' : 'CONNECT WALLET'}
+      </button>
       {errorMessage && (
         <div style={styles.error}>{errorMessage}</div>
       )}
-      {!metaMaskConnector && !coinbaseConnector && connectors.length > 0 && (
+      {!metaMaskConnector && connectors.length > 0 && (
         <div style={styles.error}>
-          No wallet connectors available. Available: {connectors.map(c => c.name || c.id).join(', ')}
+          MetaMask connector not found. Available: {connectors.map(c => c.name || c.id).join(', ')}
         </div>
       )}
     </div>
@@ -109,10 +95,6 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'flex-end',
     gap: '4px',
-  },
-  buttonGroup: {
-    display: 'flex',
-    gap: '8px',
   },
   container: {
     display: 'flex',

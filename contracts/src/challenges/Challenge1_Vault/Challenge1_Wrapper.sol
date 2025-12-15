@@ -5,45 +5,44 @@ import "../../IChallenge.sol";
 import "./Challenge1_Vault.sol";
 
 contract Challenge1_Wrapper is IChallenge {
-    EthBank public bank;
-    bool public initialized;
+    EthBank public immutable bank;
+    uint256 private constant INIT_AMOUNT = 0.001 ether;
+    uint256 private constant DEPOSIT_AMOUNT = 0.0005 ether;
+    bool private _initialized;
+
+    error AlreadyInitialized();
+    error InsufficientFunds();
 
     constructor() {
         bank = new EthBank();
     }
 
     function initialize() external payable {
-        require(!initialized, "Already initialized");
-        require(address(this).balance >= 2 ether, "Need at least 2 ether");
-        initialized = true;
-        
-        bank.deposit{value: 1 ether}();
-        bank.deposit{value: 1 ether}();
+        if (_initialized) revert AlreadyInitialized();
+        if (address(this).balance < INIT_AMOUNT) revert InsufficientFunds();
+
+        _initialized = true;
+        bank.deposit{value: DEPOSIT_AMOUNT}();
+        bank.deposit{value: DEPOSIT_AMOUNT}();
     }
 
     function isSolved() external view override returns (bool) {
-        if (!initialized) {
-            return false;
-        }
-        return address(bank).balance == 0;
+        return _initialized && address(bank).balance == 0;
     }
 
     function challengeId() external pure override returns (uint256) {
         return 1;
     }
 
-    function challengeName() external pure override returns (string memory) {
-        return "Vault Reentrancy";
+    function initialized() external view returns (bool) {
+        return _initialized;
     }
 
-    function difficulty() external pure override returns (string memory) {
-        return "Easy";
-    }
-    
     receive() external payable {
-        if (!initialized && address(this).balance >= 2 ether) {
-            this.initialize{value: 0}();
+        if (!_initialized && address(this).balance >= INIT_AMOUNT) {
+            _initialized = true;
+            bank.deposit{value: DEPOSIT_AMOUNT}();
+            bank.deposit{value: DEPOSIT_AMOUNT}();
         }
     }
 }
-

