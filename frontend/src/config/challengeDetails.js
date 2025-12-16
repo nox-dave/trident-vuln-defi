@@ -49,33 +49,69 @@ function pwn() external payable {
     title: 'Access Control',
     tags: ['solidity', 'easy', 'security', 'ctf'],
     points: 100,
-    scenario: 'The contract uses tx.origin for authentication instead of msg.sender.',
+    scenario: 'Complete the AccessControl contract implementation. Implement role-based access control with ADMIN and USER roles.',
     vulnerableCode: `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.30;
 
-contract Challenge2_Access {
-    address public owner;
-    
-    constructor() {
-        owner = tx.origin;
+contract AccessControl {
+    event GrantRole(bytes32 indexed role, address indexed account);
+    event RevokeRole(bytes32 indexed role, address indexed account);
+
+    mapping(bytes32 => mapping(address => bool)) public roles;
+
+    bytes32 public constant ADMIN = keccak256(abi.encodePacked("ADMIN"));
+
+    function _grantRole(bytes32 role, address account) internal {
+        // Write code here
     }
-    
-    function withdraw() external {
-        require(tx.origin == owner, "Not owner");
-        payable(msg.sender).transfer(address(this).balance);
+
+    function grantRole(bytes32 role, address account) external {
+        // Write code here
+    }
+
+    function revokeRole(bytes32 role, address account) external {
+        // Write code here
     }
 }`,
     tasks: [
       {
         id: 1,
-        description: 'Exploit the tx.origin vulnerability to drain the contract.',
+        description: 'Define a new role named USER, use the keccak256 hash of the string "USER" as an identifier for this role.',
+        completed: false,
+      },
+      {
+        id: 2,
+        description: 'Define modifier named onlyRole(bytes32 role) that checks msg.sender has role before executing the rest of the code.',
+        completed: false,
+      },
+      {
+        id: 3,
+        description: 'Complete function _grantRole. This function will set role for account to true and then emit the event GrantRole.',
+        completed: false,
+      },
+      {
+        id: 4,
+        description: 'Complete the external function grantRole. This function must restrict access only to msg.sender having the ADMIN role.',
+        completed: false,
+      },
+      {
+        id: 5,
+        description: 'Complete the external function revokeRole that will revoke role from account. This function must restrict access only to msg.sender having the ADMIN role.',
+        completed: false,
+      },
+      {
+        id: 6,
+        description: 'Emit the event RevokeRole.',
+        completed: false,
+      },
+      {
+        id: 7,
+        description: 'Grant role ADMIN to msg.sender when this contract is deployed.',
         completed: false,
       },
     ],
     hints: [
-      'tx.origin refers to the original EOA that initiated the transaction.',
-      'msg.sender can be a contract address.',
-      'Create an intermediary contract to exploit this.',
+      'constructor() {\n    _grantRole(ADMIN, msg.sender);\n}',
     ],
   },
   3: {

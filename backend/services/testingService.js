@@ -6,8 +6,11 @@ import { log } from '../utils/logger.js';
 import { config } from '../config/index.js';
 import {
   extractExploitContractName,
+  extractVulnerableContractName,
   extractExploitContractFromUserCode,
+  extractContractFromUserCode,
   replaceExploitContract,
+  replaceContract,
   extractTestFunctionName,
   extractError,
   getChallengeFolder
@@ -39,27 +42,50 @@ export class TestingService {
       throw new Error(`Challenge files not found: ${fileError.message}`);
     }
 
+    const challengeIdNum = Number(challengeId);
     const exploitContractName = extractExploitContractName(challengeContent);
-    if (!exploitContractName) {
-      throw new Error('Could not find exploit contract name in challenge file');
-    }
-
-    const exploitContractOnly = extractExploitContractFromUserCode(exploitCode, exploitContractName);
-    if (!exploitContractOnly) {
-      log.error('❌', 'Failed to extract contract from user code');
-      throw new Error('Could not extract exploit contract from user code. Make sure your contract is properly formatted with matching braces.');
+    const vulnerableContractName = extractVulnerableContractName(challengeContent);
+    
+    log.info('🔍', `Challenge ${challengeIdNum}: exploitContract=${exploitContractName}, vulnerableContract=${vulnerableContractName}`);
+    
+    let contractToReplace = null;
+    let contractName = null;
+    let updatedChallengeContent = null;
+    
+    if (challengeIdNum === 2) {
+      const targetContractName = vulnerableContractName || 'AccessControl';
+      log.info('🔍', `Challenge 2: Looking for contract "${targetContractName}" in user code`);
+      contractName = targetContractName;
+      contractToReplace = extractContractFromUserCode(exploitCode, targetContractName);
+      if (!contractToReplace) {
+        log.error('❌', `Failed to extract ${targetContractName} from user code`);
+        log.error('❌', `User code length: ${exploitCode.length}, contains contract: ${exploitCode.includes('contract ' + targetContractName)}`);
+        throw new Error(`Could not extract ${targetContractName} contract from user code. Make sure your contract is properly formatted with matching braces and named "${targetContractName}".`);
+      }
+      log.info('✅', `Successfully extracted ${targetContractName} contract`);
+      updatedChallengeContent = replaceContract(challengeContent, contractToReplace, targetContractName);
+    } else {
+      if (!exploitContractName) {
+        throw new Error('Could not find exploit contract name in challenge file');
+      }
+      contractName = exploitContractName;
+      contractToReplace = extractExploitContractFromUserCode(exploitCode, exploitContractName);
+      if (!contractToReplace) {
+        log.error('❌', 'Failed to extract contract from user code');
+        throw new Error('Could not extract exploit contract from user code. Make sure your contract is properly formatted with matching braces.');
+      }
+      updatedChallengeContent = replaceExploitContract(challengeContent, contractToReplace, exploitContractName);
     }
     
-    const openBraces = (exploitContractOnly.match(/\{/g) || []).length;
-    const closeBraces = (exploitContractOnly.match(/\}/g) || []).length;
+    const openBraces = (contractToReplace.match(/\{/g) || []).length;
+    const closeBraces = (contractToReplace.match(/\}/g) || []).length;
     
     if (openBraces !== closeBraces) {
       throw new Error(`Extracted contract has mismatched braces. Found ${openBraces} opening braces and ${closeBraces} closing braces. Please ensure all functions have matching opening and closing braces.`);
     }
 
-    const updatedChallengeContent = replaceExploitContract(challengeContent, exploitContractOnly, exploitContractName);
     if (!updatedChallengeContent) {
-      throw new Error('Failed to replace exploit contract in challenge file');
+      throw new Error(`Failed to replace ${contractName} contract in challenge file`);
     }
 
     const backupPath = join(this.contractsDir, 'src', 'challenges', challengeFolder, challengeFile + '.backup');
@@ -69,8 +95,13 @@ export class TestingService {
       await writeFile(backupPath, originalContent, 'utf-8');
       await writeFile(challengePath, updatedChallengeContent, 'utf-8');
 
-      const testName = extractTestFunctionName(testContent);
-      const testCommand = `cd ${this.contractsDir} && forge test --match-test ${testName} --match-path "*${testFile}" 2>&1`;
+      let testCommand;
+      if (challengeIdNum === 2) {
+        testCommand = `cd ${this.contractsDir} && forge test --match-path "*${testFile}" 2>&1`;
+      } else {
+        const testName = extractTestFunctionName(testContent);
+        testCommand = `cd ${this.contractsDir} && forge test --match-test ${testName} --match-path "*${testFile}" 2>&1`;
+      }
 
       let stdout = '';
       let stderr = '';

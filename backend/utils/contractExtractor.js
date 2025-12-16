@@ -5,7 +5,45 @@ export function extractExploitContractName(content) {
 
 export function extractVulnerableContractName(content) {
   const exploitMatch = content.match(/contract\s+\w+Exploit\s+[^{]*\{[\s\S]*?\}\s*contract\s+(\w+)\s+/);
-  return exploitMatch ? exploitMatch[1] : null;
+  if (exploitMatch) {
+    return exploitMatch[1];
+  }
+  
+  const lines = content.split('\n');
+  let foundExploit = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].match(/contract\s+\w+Exploit\s*[{\s]/)) {
+      foundExploit = true;
+      let braceCount = 0;
+      let exploitStart = false;
+      
+      for (let j = i; j < lines.length; j++) {
+        const line = lines[j];
+        for (let k = 0; k < line.length; k++) {
+          if (line[k] === '{') {
+            braceCount++;
+            exploitStart = true;
+          } else if (line[k] === '}') {
+            braceCount--;
+            if (exploitStart && braceCount === 0) {
+              for (let m = j + 1; m < lines.length; m++) {
+                const contractMatch = lines[m].match(/contract\s+(\w+)\s*[{\s]/);
+                if (contractMatch) {
+                  return contractMatch[1];
+                }
+              }
+              break;
+            }
+          }
+        }
+        if (exploitStart && braceCount === 0) {
+          break;
+        }
+      }
+    }
+  }
+  
+  return null;
 }
 
 export function extractInterface(content) {
@@ -68,9 +106,13 @@ export function extractExploitContractFromUserCode(userCode, contractName) {
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (contractStart === -1 && line.match(new RegExp(`contract\\s+${contractName}\\s*[\\{;]`))) {
+    const contractPattern = new RegExp(`contract\\s+${contractName}\\s*[\\{;]`, 'i');
+    if (contractStart === -1 && contractPattern.test(line)) {
       contractStart = i;
       braceCount = countStructuralBraces(line);
+      if (braceCount === 0 && line.includes('{')) {
+        braceCount = 1;
+      }
     } else if (contractStart !== -1) {
       braceCount += countStructuralBraces(line);
       if (braceCount === 0) {
@@ -170,7 +212,15 @@ export function extractExploitContractFromUserCode(userCode, contractName) {
   return null;
 }
 
+export function extractContractFromUserCode(userCode, contractName) {
+  return extractExploitContractFromUserCode(userCode, contractName);
+}
+
 export function replaceExploitContract(content, newExploitContract, contractName) {
+  return replaceContract(content, newExploitContract, contractName);
+}
+
+export function replaceContract(content, newContract, contractName) {
   const lines = content.split('\n');
   let contractStart = -1;
   let braceCount = 0;
@@ -192,15 +242,15 @@ export function replaceExploitContract(content, newExploitContract, contractName
   if (contractStart !== -1 && contractEnd !== -1) {
     const before = lines.slice(0, contractStart).join('\n');
     const after = lines.slice(contractEnd + 1).join('\n');
-    return before + '\n' + newExploitContract.trim() + '\n' + after;
+    return before + '\n' + newContract.trim() + '\n' + after;
   }
   
-  const exploitContractRegex = new RegExp(
+  const contractRegex = new RegExp(
     `contract\\s+${contractName}\\s+[^{]*\\{[\\s\\S]*?\\n\\}`,
     'g'
   );
   
-  return content.replace(exploitContractRegex, newExploitContract.trim());
+  return content.replace(contractRegex, newContract.trim());
 }
 
 export function extractTestFunctionName(testContent) {
