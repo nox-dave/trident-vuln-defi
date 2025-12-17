@@ -16,7 +16,7 @@ export const config = {
   challengeMap: {
     1: 'Challenge1_Vault',
     2: 'Challenge2_Access',
-    3: 'Challenge3_Token',
+    3: 'Challenge3_Storage',
     4: 'Challenge4_Lottery',
     5: 'Challenge5_Proxy',
   },

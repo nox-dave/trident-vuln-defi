@@ -24,8 +24,8 @@ export const CHALLENGES = [
   },
   {
     id: 3,
-    name: 'Token Overflow',
-    description: 'Exploit integer overflow vulnerability',
+    name: 'Misaligned Storage',
+    description: 'Exploit upgradeable wallet storage misalignment',
     difficulty: 'Medium',
     ascii: '┌─────┐\n│99999│\n└──┬──┘\n▼\n┌──┬──┐\n│00000│\n└─────┘',
   },

