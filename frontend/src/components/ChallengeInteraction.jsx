@@ -11,6 +11,7 @@ import {
 import { CONTRACT_ADDRESSES, CHALLENGES, DEPLOYED_CHALLENGES } from '../config/contracts'
 import { CHALLENGE_DETAILS } from '../config/challengeDetails'
 import { parseAbi, encodeFunctionData } from 'viem'
+import { readContract } from 'wagmi/actions'
 import { runTest, loadExploitTemplate, verifyOnSepolia } from '../utils/testRunner'
 
 function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
@@ -18,6 +19,7 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
   const config = useConfig()
   const [challengeAddress, setChallengeAddress] = useState(null)
   const [exploitAddress, setExploitAddress] = useState(null)
+  const [targetAddress, setTargetAddress] = useState(null)
   const [isDeploying, setIsDeploying] = useState(false)
   const [isDeployingExploit, setIsDeployingExploit] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
@@ -46,6 +48,14 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
       loadChallengeAddress()
     }
   }, [challenge, config])
+
+  useEffect(() => {
+    if (challengeAddress && challenge?.id === 3) {
+      loadWalletAddress()
+    } else if (challengeAddress) {
+      setTargetAddress(challengeAddress)
+    }
+  }, [challengeAddress, challenge])
 
   useEffect(() => {
     if (challenge) {
@@ -101,6 +111,23 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
       if (DEPLOYED_CHALLENGES[challenge.id]) {
         setChallengeAddress(DEPLOYED_CHALLENGES[challenge.id])
       }
+    }
+  }
+
+  const loadWalletAddress = async () => {
+    if (!challengeAddress || challenge?.id !== 3) return
+    
+    try {
+      const walletAddress = await readContract(config, {
+        address: challengeAddress,
+        abi: parseAbi(['function wallet() external view returns (address)']),
+        functionName: 'wallet',
+      })
+      setTargetAddress(walletAddress)
+      console.log('Loaded wallet address for Challenge 3:', walletAddress)
+    } catch (error) {
+      console.error('Failed to load wallet address:', error)
+      setTargetAddress(challengeAddress)
     }
   }
 
@@ -384,10 +411,11 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
       const bytecode = compiledExploit.evm?.bytecode?.object || compiledExploit.bytecode
       const abi = compiledExploit.abi
       
+      const targetAddr = targetAddress || challengeAddress
       deployExploitWrite({
         abi: abi,
         bytecode: bytecode,
-        args: [challengeAddress],
+        args: [targetAddr],
       })
     } catch (error) {
       setStatus(`Exploit deployment failed: ${error.message}`)
@@ -412,12 +440,20 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
     setIsExecuting(true)
     setStatus('Executing exploit...')
     try {
-      executeWrite({
-        address: exploitAddress,
-        abi: parseAbi(['function attack() external payable']),
-        functionName: 'attack',
-        value: balance || BigInt(100000000000000000),
-      })
+      if (challenge.id === 1) {
+        executeWrite({
+          address: exploitAddress,
+          abi: parseAbi(['function pwn() external payable']),
+          functionName: 'pwn',
+          value: balance || BigInt(1000000000000000000),
+        })
+      } else {
+        executeWrite({
+          address: exploitAddress,
+          abi: parseAbi(['function pwn() external']),
+          functionName: 'pwn',
+        })
+      }
     } catch (error) {
       setStatus(`Execution failed: ${error.message}`)
       setIsExecuting(false)

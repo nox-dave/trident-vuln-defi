@@ -15,11 +15,11 @@ contract Challenge3_StorageTest is Test {
         implementation = new WalletImplementation();
         wallet = new UpgradeableWallet(address(implementation));
 
-        deal(address(wallet), 10 ether);
+        deal(address(wallet), 0.001 ether);
 
         vm.prank(owner);
         (bool success, ) = address(wallet).call(
-            abi.encodeWithSignature("setWithdrawLimit(uint256)", 1 ether)
+            abi.encodeWithSignature("setWithdrawLimit(uint256)", 0.0005 ether)
         );
         require(success, "setWithdrawLimit failed");
 

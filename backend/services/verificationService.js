@@ -22,6 +22,8 @@ const PROGRESS_TRACKER_ABI = parseAbi([
 
 const DEPLOYED_CHALLENGES = {
   1: '0x151868cFA58C4807eDf88B5203EbCfF93ac4c8D7',
+  2: '0xf6aC18Cb090d27200Be3335cf6B7Bc9fCD6C35Ad',
+  3: '0x39959D9CE9C8385e3a8dDE5a8bB425996C619163',
 };
 
 const ENV_VAR_NAMES = {
@@ -134,7 +136,7 @@ export class VerificationService {
       }
 
       if (!challengeAddress || challengeAddress === '0x0000000000000000000000000000000000000000') {
-        if (DEPLOYED_CHALLENGES[challengeId]) {
+        if (DEPLOYED_CHALLENGES[challengeId] && DEPLOYED_CHALLENGES[challengeId] !== null) {
           challengeAddress = DEPLOYED_CHALLENGES[challengeId];
           log.info(`Using deployed challenge address for challenge ${challengeId}: ${challengeAddress}`);
           
