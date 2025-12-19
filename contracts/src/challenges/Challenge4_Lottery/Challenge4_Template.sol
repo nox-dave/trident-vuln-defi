@@ -1,8 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.30;
 
-contract Challenge4Exploit {
-    function pwn() external {
-    }
+interface ISevenEth {
+    function play() external payable;
 }
 
+contract SevenEthExploit {
+    address public target;
+
+    constructor(address _target) {
+        target = _target;
+    }
+
+    function pwn() external payable {
+    }
+}
