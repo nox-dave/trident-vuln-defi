@@ -2,9 +2,9 @@
 pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {LendingPoolExploit, LendingPool, SimpleERC20} from "./Challenge5_Proxy.sol";
+import {LendingPoolExploit, LendingPool, SimpleERC20} from "./Challenge5_FlashLoan.sol";
 
-contract Challenge5_ProxyTest is Test {
+contract Challenge5_FlashLoanTest is Test {
     SimpleERC20 private token;
     LendingPool private pool;
     LendingPoolExploit private exploit;

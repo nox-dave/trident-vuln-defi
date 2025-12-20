@@ -38,10 +38,12 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
   const { writeContract: deployChallengeWrite, data: deployHash, isPending: isDeployPending } = useWriteContract()
   const { writeContract: executeWrite, data: executeHash, isPending: isExecutePending } = useWriteContract()
   const { writeContract: deployExploitWrite, data: deployExploitHash, isPending: isDeployExploitPending } = useWriteContract()
+  const { writeContract: fundExploitWrite, data: fundHash, isPending: isFundPending } = useWriteContract()
 
   const { isLoading: isDeployConfirming } = useWaitForTransactionReceipt({ hash: deployHash })
   const { isLoading: isExecuteConfirming } = useWaitForTransactionReceipt({ hash: executeHash })
   const { data: deployExploitReceipt, isLoading: isDeployExploitConfirming } = useWaitForTransactionReceipt({ hash: deployExploitHash })
+  const { data: fundReceipt, isLoading: isFundConfirming } = useWaitForTransactionReceipt({ hash: fundHash })
 
   useEffect(() => {
     if (challenge && CONTRACT_ADDRESSES.CHALLENGE_FACTORY) {
@@ -52,6 +54,8 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
   useEffect(() => {
     if (challengeAddress && challenge?.id === 3) {
       loadWalletAddress()
+    } else if (challengeAddress && challenge?.id === 4) {
+      loadGameAddress()
     } else if (challengeAddress) {
       setTargetAddress(challengeAddress)
     }
@@ -127,6 +131,23 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
       console.log('Loaded wallet address for Challenge 3:', walletAddress)
     } catch (error) {
       console.error('Failed to load wallet address:', error)
+      setTargetAddress(challengeAddress)
+    }
+  }
+
+  const loadGameAddress = async () => {
+    if (!challengeAddress || challenge?.id !== 4) return
+    
+    try {
+      const gameAddress = await readContract(config, {
+        address: challengeAddress,
+        abi: parseAbi(['function game() external view returns (address)']),
+        functionName: 'game',
+      })
+      setTargetAddress(gameAddress)
+      console.log('Loaded game address for Challenge 4:', gameAddress)
+    } catch (error) {
+      console.error('Failed to load game address:', error)
       setTargetAddress(challengeAddress)
     }
   }
@@ -396,13 +417,50 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
       setExploitAddress(deployExploitReceipt.contractAddress)
       setStatus('Exploit contract deployed successfully')
       setIsDeployingExploit(false)
+      if (challenge?.id === 4 && challengeAddress) {
+        setTimeout(() => fundExploitContract(deployExploitReceipt.contractAddress), 500)
+      }
     }
   }, [deployExploitReceipt])
+
+  useEffect(() => {
+    if (fundReceipt && !isFundConfirming && challenge?.id === 4) {
+      setStatus('✅ Exploit contract funded! You can now execute it.')
+    }
+  }, [fundReceipt, isFundConfirming])
+
+  const fundExploitContract = async (exploitAddr) => {
+    if (!challengeAddress || !exploitAddr) return
+    
+    try {
+      setStatus('Funding exploit contract...')
+      fundExploitWrite({
+        address: challengeAddress,
+        abi: parseAbi(['function fundExploit(address) external']),
+        functionName: 'fundExploit',
+        args: [exploitAddr],
+      })
+    } catch (error) {
+      console.error('Failed to fund exploit:', error)
+      setStatus('Exploit deployed. Note: Wrapper may need to be redeployed with fundExploit function.')
+    }
+  }
 
   const handleDeployExploit = async () => {
     if (!compiledExploit || !challengeAddress) {
       setStatus('Please compile exploit contract first and deploy challenge')
       return
+    }
+
+    if (challenge?.id === 4) {
+      if (!targetAddress) {
+        setStatus('Loading game address... Please wait')
+        await loadGameAddress()
+        if (!targetAddress) {
+          setStatus('Failed to load game address. Please try again.')
+          return
+        }
+      }
     }
 
     setIsDeployingExploit(true)
@@ -412,6 +470,20 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
       const abi = compiledExploit.abi
       
       const targetAddr = targetAddress || challengeAddress
+      if (challenge?.id === 4) {
+        console.log('Deploying Challenge 4 exploit with target:', targetAddr)
+        const gameAddress = await readContract(config, {
+          address: challengeAddress,
+          abi: parseAbi(['function game() external view returns (address)']),
+          functionName: 'game',
+        })
+        console.log('Expected game address:', gameAddress)
+        if (targetAddr.toLowerCase() !== gameAddress.toLowerCase()) {
+          setStatus(`⚠️ ERROR: Target is ${targetAddr}, but must be game address ${gameAddress}`)
+          setIsDeployingExploit(false)
+          return
+        }
+      }
       deployExploitWrite({
         abi: abi,
         bytecode: bytecode,
@@ -447,6 +519,13 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
           functionName: 'pwn',
           value: balance || BigInt(1000000000000000000),
         })
+      } else if (challenge.id === 4) {
+        console.log('Executing Challenge 4 exploit (funded by wrapper)')
+        executeWrite({
+          address: exploitAddress,
+          abi: parseAbi(['function pwn() external payable']),
+          functionName: 'pwn',
+        })
       } else {
         executeWrite({
           address: exploitAddress,
@@ -462,10 +541,63 @@ function ChallengeInteraction({ challenge, onBack, onNextChallenge }) {
 
   useEffect(() => {
     if (executeHash && !isExecuteConfirming) {
-      setStatus('Exploit executed. Check if challenge is solved.')
       setIsExecuting(false)
+      checkChallengeSolved()
     }
   }, [executeHash, isExecuteConfirming])
+
+  const checkChallengeSolved = async () => {
+    if (!challengeAddress || !config) return
+    
+    try {
+      const isSolved = await readContract(config, {
+        address: challengeAddress,
+        abi: parseAbi(['function isSolved() external view returns (bool)']),
+        functionName: 'isSolved',
+      })
+      
+      if (isSolved) {
+        setStatus('✅ Exploit executed successfully! Challenge is solved. You can now verify.')
+        setStatusColor('#00ff00')
+      } else {
+        if (challenge?.id === 4) {
+          try {
+            const gameAddress = await readContract(config, {
+              address: challengeAddress,
+              abi: parseAbi(['function game() external view returns (address)']),
+              functionName: 'game',
+            })
+            const publicClient = config.publicClient
+            if (publicClient) {
+              const gameBalance = await publicClient.getBalance({ address: gameAddress })
+              const required = BigInt(10000000000000000)
+              if (gameBalance < required) {
+                setStatus(`⚠️ Exploit executed but challenge not solved. Game balance: ${gameBalance.toString()} wei. Needs > 0.01 ETH (${required.toString()} wei). Make sure your exploit sent ETH to the game address: ${gameAddress}`)
+                setStatusColor('#ffaa00')
+              } else {
+                setStatus('⚠️ Exploit executed. Challenge should be solved. Try verifying again.')
+                setStatusColor('#ffaa00')
+              }
+            } else {
+              setStatus('⚠️ Exploit executed. Checking if challenge is solved...')
+              setStatusColor('#ffaa00')
+            }
+          } catch (error) {
+            console.error('Failed to check game balance:', error)
+            setStatus('⚠️ Exploit executed. Challenge may not be solved. Please verify.')
+            setStatusColor('#ffaa00')
+          }
+        } else {
+          setStatus('⚠️ Exploit executed but challenge not solved. Please check your exploit.')
+          setStatusColor('#ffaa00')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check challenge status:', error)
+      setStatus('Exploit executed. Check if challenge is solved.')
+      setStatusColor('#ffff00')
+    }
+  }
 
   const handleVerifyOnSepolia = async () => {
     if (!address) {

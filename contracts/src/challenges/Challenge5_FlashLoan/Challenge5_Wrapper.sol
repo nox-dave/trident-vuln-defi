@@ -2,19 +2,21 @@
 pragma solidity 0.8.30;
 
 import "../../IChallenge.sol";
-import "./Challenge4_Lottery.sol";
+import "./Challenge5_FlashLoan.sol";
 
-contract Challenge4_Wrapper is IChallenge {
-    SevenEth public immutable game;
+contract Challenge5_Wrapper is IChallenge {
+    LendingPool public immutable pool;
+    SimpleERC20 public immutable token;
     uint256 private constant INIT_AMOUNT = 0.001 ether;
-    uint256 private constant DEPOSIT_AMOUNT = 0.0005 ether;
+    uint256 private constant TOKEN_AMOUNT = 1000e18;
     bool private _initialized;
 
     error AlreadyInitialized();
     error InsufficientFunds();
 
     constructor() {
-        game = new SevenEth();
+        token = new SimpleERC20();
+        pool = new LendingPool(address(token));
     }
 
     function initialize() external payable {
@@ -23,16 +25,15 @@ contract Challenge4_Wrapper is IChallenge {
 
         _initialized = true;
         
-        game.play{value: DEPOSIT_AMOUNT}();
-        game.play{value: DEPOSIT_AMOUNT}();
+        token.mint(address(pool), TOKEN_AMOUNT);
     }
 
     function isSolved() external view override returns (bool) {
-        return _initialized && address(game).balance > 7 ether;
+        return _initialized && token.balanceOf(address(pool)) == 0;
     }
 
     function challengeId() external pure override returns (uint256) {
-        return 4;
+        return 5;
     }
 
     function initialized() external view returns (bool) {
@@ -43,8 +44,7 @@ contract Challenge4_Wrapper is IChallenge {
         if (!_initialized && address(this).balance >= INIT_AMOUNT) {
             _initialized = true;
             
-            game.play{value: DEPOSIT_AMOUNT}();
-            game.play{value: DEPOSIT_AMOUNT}();
+            token.mint(address(pool), TOKEN_AMOUNT);
         }
     }
 }

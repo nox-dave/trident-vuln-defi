@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-interface ISevenEth {
-    function play() external payable;
-}
-
 contract SevenEthExploit {
-    address public target;
+    address private immutable target;
 
     constructor(address _target) {
         target = _target;
     }
 
+    receive() external payable {}
+
     function pwn() external payable {
+        // write your code here
     }
 }

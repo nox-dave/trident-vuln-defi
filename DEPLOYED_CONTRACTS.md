@@ -53,6 +53,7 @@
 | Challenge1 | ETH-Requiring | `0.001 ether` | 2x `0.0005 ether` deposits | ✅ Compliant |
 | Challenge2 | Template | `0 ether` | N/A | ✅ Compliant |
 | Challenge3 | ETH-Requiring | `0.001 ether` | `0.0005 ether` withdraw limit | ✅ Compliant |
+| Challenge4 | ETH-Requiring | `0.001 ether` | 2x `0.0005 ether` deposits | ✅ Compliant |
 
 ### Enforcement
 
@@ -107,6 +108,29 @@
   - `initialize()` - Initialize with 0.001 ether
   - `isSolved()` - Returns true if wallet balance is 0
   - `challengeId()` - Returns 3
+
+### Challenge4_Wrapper
+- **Address**: `0x739C920641e896aa48Fb1cDDbc4c1C6568a68Ca2`
+- **Challenge ID**: 4
+- **Status**: ✅ Deployed and Registered
+- **Purpose**: Wrapper contract implementing IChallenge interface for Force Send ETH challenge
+- **Initialization**: Requires `0.001 ether + 0.01 ether` total (✅ Compliant with price structure for user-facing costs)
+  - `0.001 ether` for game initialization (2x `0.0005 ether` deposits)
+  - `0.01 ether` held in wrapper for automatic exploit funding (one-time deployment cost, users don't pay this)
+- **Internal Amounts**: 2x `0.0005 ether` deposits (Alice and Bob)
+- **Key Functions**:
+  - `initialize()` - Initialize with 0.001 ether + 0.01 ether total (0.001 for game + 0.01 for exploit funding)
+  - `fundExploit(address)` - **CRITICAL**: Sends 0.01 ETH to exploit contract (users don't need to send ETH)
+  - `isSolved()` - Returns true if game balance > 0.01 ether (game disabled)
+  - `challengeId()` - Returns 4
+- **⚠️ CRITICAL DESIGN PATTERN**: 
+  - **Users DO NOT send ETH to solve this challenge**
+  - Wrapper holds 0.01 ETH during initialization (one-time deployment cost)
+  - Frontend automatically calls `fundExploit()` after deploying exploit
+  - Exploit receives 0.01 ETH from wrapper, not from user
+  - This matches the pattern of Challenge 1 and Challenge 3 (no user ETH required)
+  - **Browser Tests**: Use Foundry's `deal()` cheatcode - NO real ETH needed ✅
+  - Challenge descriptions mentioning ETH amounts (e.g., "7 ETH") are educational context only
 
 ### AccessControl
 - **Address**: `0x0205EdE733Ff8A6cDF5B5BB47D916A35469ECe87`
@@ -167,6 +191,25 @@
   - `pwn()` - Main exploit function
   - `malicious` - Malicious implementation contract
 
+### SevenEth
+- **Address**: `0x75D11abC8c00628c04768eF03Cc2E50A208Ed54B`
+- **Status**: ✅ Deployed
+- **Purpose**: Vulnerable game contract with force send vulnerability
+- **Deployed By**: Challenge4_Wrapper constructor
+- **Key Functions**:
+  - `play()` - Deposit 0.0005 ether to play (scaled down from 1 ether for price structure)
+  - Game is disabled when balance > 0.01 ether (scaled down from 7 ether for educational purposes)
+
+### SevenEthExploit
+- **Address**: Deployed by users (example: `0xf5Ec9BAB2AD5ceEe106319Ecc8508107435c1798`)
+- **Purpose**: Exploits the force send vulnerability in SevenEth
+- **Target**: SevenEth contract address (`0x75D11abC8c00628c04768eF03Cc2E50A208Ed54B`)
+- **Status**: ✅ Pattern established, users deploy their own
+- **Key Functions**:
+  - `receive() external payable {}` - **REQUIRED**: Receives ETH from wrapper's `fundExploit()` call
+  - `pwn()` - Force sends ETH via selfdestruct to disable game (uses ETH received from wrapper)
+- **⚠️ IMPORTANT**: The exploit contract MUST include a `receive()` function to receive ETH from the wrapper's `fundExploit()` call. Without it, the funding transaction will revert.
+
 ## Account Information
 
 ### Deployer/Owner
@@ -186,7 +229,8 @@ Deployer (0x491dcF33...)
     │                   │
     │                   ├── challengeAddresses[1] = Challenge1_Wrapper
     │                   ├── challengeAddresses[2] = Challenge2_Wrapper
-    │                   └── challengeAddresses[3] = Challenge3_Wrapper (TBD)
+    │                   ├── challengeAddresses[3] = Challenge3_Wrapper
+    │                   └── challengeAddresses[4] = Challenge4_Wrapper (0x739C9206...)
     │
     ├── Deploys → Challenge1_Wrapper (0x151868cF...)
     │                   │
@@ -201,13 +245,21 @@ Deployer (0x491dcF33...)
     │                   ├── Constructor → UpgradeableWallet (0x417b2968...)
     │                   └── Constructor → WalletImplementation
     │
+    ├── Deploys → Challenge4_Wrapper (0x739C9206...)
+    │                   │
+    │                   └── Constructor → SevenEth (0x75D11abC...)
+    │
     ├── Deploys → EthBankExploit (0x84093c4e...)
     │                   │
     │                   └── Targets → EthBank (0xe8AB2941...)
     │
-    └── Deploys → UpgradeableWalletExploit (0x02AaBE20...)
+    ├── Deploys → UpgradeableWalletExploit (0x02AaBE20...)
+    │                   │
+    │                   └── Targets → UpgradeableWallet (0x417b2968...)
+    │
+    └── Users Deploy → SevenEthExploit (TBD)
                         │
-                        └── Targets → UpgradeableWallet (0x417b2968...)
+                        └── Targets → SevenEth
 ```
 
 ## Verification Flow
@@ -245,6 +297,20 @@ Deployer (0x491dcF33...)
 6. ProgressTracker records the solution
 7. Verification complete ✅
 
+### Challenge 4
+1. User deploys exploit contract (targeting game address)
+2. **Frontend automatically calls `wrapper.fundExploit(exploitAddress)`** - sends 0.01 ETH from wrapper to exploit
+3. User executes `pwn()` function (NO ETH needed from user - exploit already funded)
+4. Exploit force sends 0.01 ETH via selfdestruct to SevenEth game
+5. Challenge4_Wrapper.isSolved() returns true (game balance > 0.01 ether, game disabled)
+6. User calls ChallengeFactory.verifyAndRecord(userAddress, 4)
+7. Factory checks:
+   - Challenge is registered ✓
+   - Challenge.isSolved() returns true ✓
+8. Factory calls ProgressTracker.recordSolution(userAddress, 4)
+9. ProgressTracker records the solution
+10. Verification complete ✅
+
 ## Configuration Files
 
 ### Frontend Config
@@ -254,6 +320,7 @@ Deployer (0x491dcF33...)
 - DEPLOYED_CHALLENGES[1]: `0x151868cFA58C4807eDf88B5203EbCfF93ac4c8D7`
 - DEPLOYED_CHALLENGES[2]: `0xf6aC18Cb090d27200Be3335cf6B7Bc9fCD6C35Ad`
 - DEPLOYED_CHALLENGES[3]: `0xaF6B5f41D51AF63e5A10b106674Ef45A4AD762C8`
+- DEPLOYED_CHALLENGES[4]: `0x739C920641e896aa48Fb1cDDbc4c1C6568a68Ca2`
 
 ### Backend Config
 - File: `backend/config/index.js`
@@ -275,6 +342,10 @@ Deployer (0x491dcF33...)
 8. **Challenge3_Wrapper** - Deployed and initialized with `0.001 ether` (✅ Price structure compliant)
 9. **Registration** - Challenge3_Wrapper registered with factory
 10. **UpgradeableWalletExploit** - Deployed and executed to solve challenge
+11. **Challenge4_Wrapper** - Deployed and initialized with `0.001 ether + 0.01 ether` total:
+    - `0.001 ether` for game initialization (✅ Price structure compliant for user-facing costs)
+    - `0.01 ether` held in wrapper for automatic exploit funding (one-time deployment cost, users don't pay this)
+12. **Registration** - Challenge4_Wrapper registered with factory
 
 ## Notes
 
@@ -282,7 +353,11 @@ Deployer (0x491dcF33...)
 - ✅ **Challenge1**: Uses `0.001 ether` for initialization (2x `0.0005 ether` deposits) - COMPLIANT
 - ✅ **Challenge2**: No ETH required (template challenge) - COMPLIANT
 - ✅ **Challenge3**: Uses `0.001 ether` for initialization (`0.0005 ether` withdraw limit) - COMPLIANT
+- ✅ **Challenge4**: Uses `0.001 ether` for game initialization (2x `0.0005 ether` deposits) - COMPLIANT
+  - **Note**: Wrapper holds additional `0.01 ether` for exploit funding, but users don't pay this
+  - Users solve challenge with ZERO ETH cost (wrapper funds exploit automatically)
 - **ALL future challenges MUST follow the `0.001 ether` maximum initialization cost standard**
+- **CRITICAL**: Challenges should NOT require users to send ETH to solve them. If exploit needs ETH, wrapper should fund it automatically.
 
 ### Challenge Status
 - Challenge1 is fully solved and verified
@@ -295,4 +370,37 @@ Deployer (0x491dcF33...)
 - ProgressTracker only accepts calls from the factory contract
 - All challenges are registered in ChallengeFactory.challengeAddresses mapping
 - All challenges implement the IChallenge interface for consistent verification
+
+## ⚠️ CRITICAL DESIGN PRINCIPLE: NO USER ETH REQUIRED
+
+**ALL challenges must be solvable WITHOUT requiring users to send ETH.**
+
+### Design Pattern
+- **Challenge 1**: Exploit uses ETH already in the bank (from initialization)
+- **Challenge 2**: Template challenge, no ETH needed
+- **Challenge 3**: Exploit manipulates storage, no ETH needed
+- **Challenge 4**: Wrapper holds 0.01 ETH and automatically funds exploit via `fundExploit()` function
+
+### Challenge 4 Implementation Details
+- **Wrapper Initialization**: Requires `0.001 ether + 0.01 ether` total
+  - `0.001 ether` for game setup (user-facing cost, compliant with price structure)
+  - `0.01 ether` held in wrapper for exploit funding (one-time deployment cost)
+- **User Flow**:
+  1. User deploys exploit contract (no ETH needed)
+  2. Frontend automatically calls `wrapper.fundExploit(exploitAddress)` 
+  3. Wrapper sends 0.01 ETH to exploit contract
+  4. User executes `pwn()` (no ETH needed - exploit already funded)
+  5. Exploit selfdestructs with 0.01 ETH to game contract
+  6. Challenge solved ✅
+- **⚠️ IMPORTANT**: Challenge descriptions may mention ETH amounts (e.g., "10 ETH will be sent to pwn") - these are **educational context only**. 
+  - **Browser Tests**: Use Foundry's `deal()` cheatcode to simulate ETH (no real ETH needed)
+  - **On-Chain**: Wrapper automatically funds exploits (users don't send ETH)
+  - **Users NEVER need real ETH or testnet ETH to solve challenges**
+
+### Enforcement
+- **Frontend**: Automatically calls funding functions after exploit deployment
+- **Wrapper Contracts**: Must provide funding mechanism if exploit needs ETH
+- **User Experience**: Users should NEVER need to send ETH to solve challenges
+- **Deployment**: One-time cost to deploy wrapper with funding (acceptable)
+- **Solving**: Zero cost to users (required)
 

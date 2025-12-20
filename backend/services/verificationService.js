@@ -10,6 +10,8 @@ const CHALLENGE_FACTORY_ABI = parseAbi([
   'function updateChallengeAddress(uint256 challengeId, address newAddress) external',
   'function setChallengeImplementation(uint256 challengeId, address implementation) external',
   'function deployChallenge(uint256 challengeId) external returns (address)',
+  'error ChallengeNotSolved()',
+  'error ChallengeNotDeployed()',
 ]);
 
 const ICHALLENGE_ABI = parseAbi([
@@ -23,7 +25,8 @@ const PROGRESS_TRACKER_ABI = parseAbi([
 const DEPLOYED_CHALLENGES = {
   1: '0x151868cFA58C4807eDf88B5203EbCfF93ac4c8D7',
   2: '0xf6aC18Cb090d27200Be3335cf6B7Bc9fCD6C35Ad',
-  3: '0x39959D9CE9C8385e3a8dDE5a8bB425996C619163',
+  3: '0xaF6B5f41D51AF63e5A10b106674Ef45A4AD762C8',
+  4: '0x739C920641e896aa48Fb1cDDbc4c1C6568a68Ca2',
 };
 
 const ENV_VAR_NAMES = {
@@ -200,6 +203,26 @@ export class VerificationService {
       }
 
       try {
+        const isSolved = await publicClient.readContract({
+          address: challengeAddress,
+          abi: ICHALLENGE_ABI,
+          functionName: 'isSolved',
+        });
+        
+        if (!isSolved) {
+          const networkName = NETWORK_NAMES[this.network] || 'Polygon Amoy';
+          if (challengeId === 4) {
+            const gameAddress = await publicClient.readContract({
+              address: challengeAddress,
+              abi: parseAbi(['function game() external view returns (address)']),
+              functionName: 'game',
+            });
+            const gameBalance = await publicClient.getBalance({ address: gameAddress });
+            throw new Error(`Challenge not solved on-chain. Game balance is ${gameBalance.toString()} wei, but needs to be > 0.01 ether (10000000000000000 wei). Make sure you deployed your exploit with the game address (${gameAddress}) as the target and executed it with 0.01 ETH.`);
+          }
+          throw new Error(`Challenge not solved on-chain. You need to deploy your exploit contract on ${networkName} and execute it to solve the challenge before verifying.`);
+        }
+        
         await publicClient.simulateContract({
           address: this.factoryAddress,
           abi: CHALLENGE_FACTORY_ABI,
@@ -211,10 +234,10 @@ export class VerificationService {
         const errorMsg = simulationError.message || simulationError.toString();
         const networkName = NETWORK_NAMES[this.network] || 'Polygon Amoy';
         
-        if (errorMsg.includes('ChallengeNotDeployed') || errorMsg.includes('Challenge not deployed')) {
+        if (errorMsg.includes('ChallengeNotDeployed') || errorMsg.includes('Challenge not deployed') || errorMsg.includes('0xb07de0f6')) {
           throw new Error(`Challenge not deployed. The challenge needs to be registered with the factory on ${networkName} first. Your challenge at ${DEPLOYED_CHALLENGES[challengeId] || 'unknown'} is solved but not registered.`);
-        } else if (errorMsg.includes('ChallengeNotSolved') || errorMsg.includes('Challenge not solved')) {
-          throw new Error(`Challenge not solved on-chain. You need to deploy your exploit contract on ${networkName} and execute it to solve the challenge before verifying.`);
+        } else if (errorMsg.includes('ChallengeNotSolved') || errorMsg.includes('Challenge not solved') || errorMsg.includes('0x533d028a') || errorMsg.includes('Game balance')) {
+          throw simulationError;
         } else if (errorMsg.includes('insufficient funds') || errorMsg.includes('insufficient balance')) {
           throw new Error(`Insufficient funds. The verification account needs more ${networkName} MATIC to pay for gas fees.`);
         }

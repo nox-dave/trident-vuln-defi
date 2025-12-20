@@ -17,8 +17,8 @@ export const config = {
     1: 'Challenge1_Vault',
     2: 'Challenge2_Access',
     3: 'Challenge3_Storage',
-    4: 'Challenge4_Lottery',
-    5: 'Challenge5_Proxy',
+    4: 'Challenge4_ForceSendEth',
+    5: 'Challenge5_FlashLoan',
   },
   network: process.env.NETWORK || 'polygonAmoy',
   polygonAmoy: {

