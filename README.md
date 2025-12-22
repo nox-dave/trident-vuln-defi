@@ -7,11 +7,11 @@
 
 # **TRIDENT**
 
-### Smart Contract Security Learning Platform
+### Smart Contract Penetration Testing Learning Platform
 
 </div>
 
-Educational platform for learning smart contract security through hands-on exploitation of intentionally vulnerable DeFi contracts.
+Educational platform for learning smart contract penetration testing through hands-on exploitation of intentionally vulnerable DeFi contracts.
 
 ## Tech Stack
 
@@ -28,6 +28,29 @@ trident-vuln-defi/
 ├── backend/            # API for compilation, testing, and verification
 ├── frontend/           # React web interface
 ```
+
+## Architecture
+
+### Frontend (React + Vite)
+- React app with wagmi/viem for blockchain interactions
+- Monaco editor for code editing
+- Challenge list with progress tracking
+- Certificate display (ERC-721 NFTs)
+- On-chain deployment and execution flow
+
+### Backend (Node.js + Express)
+- **Compilation service**: Uses `solc` to compile user code
+- **Testing service**: Runs Foundry tests by replacing exploit contracts in challenge files
+- **Verification service**: Verifies solutions on-chain via ChallengeFactory
+- **Challenge service**: Loads templates and challenge info
+- **API endpoints**: `/api/compile`, `/api/test`, `/api/verify`, `/api/challenge/:id/template`
+
+### Smart Contracts (Solidity 0.8.30 + Foundry)
+- **ChallengeFactory**: Manages challenge registration and verification
+- **ProgressTracker**: Tracks solved challenges per user
+- **Certificate**: ERC-721 soulbound NFT for milestones (5, 10, 20 challenges)
+- **Challenge wrappers**: Each implements `IChallenge` interface
+- **5 challenges** covering different vulnerabilities
 
 ## Setup
 
@@ -72,32 +95,44 @@ npm install
 npm run dev
 ```
 
-## Deployed Challenges
+## Challenges
 
-See `DEPLOYED_CONTRACTS.md` for complete deployment details.
+Each challenge includes:
+- **Template file**: Starting point for users
+- **Challenge file**: Contains vulnerable contract + exploit contract placeholder
+- **Test file**: Foundry test that validates the exploit
+- **Wrapper contract**: Implements `IChallenge` interface, checks if challenge is solved
 
-| Challenge | Type | Vulnerability | Address |
-|-----------|------|--------------|---------|
-| Challenge 1 | Vault Reentrancy | Reentrancy | `0x151868cFA58C4807eDf88B5203EbCfF93ac4c8D7` |
-| Challenge 2 | Access Control | tx.origin flaw | `0xf6aC18Cb090d27200Be3335cf6B7Bc9fCD6C35Ad` |
-| Challenge 3 | Storage Misalignment | Storage collision | `0xaF6B5f41D51AF63e5A10b106674Ef45A4AD762C8` |
+### The 5 Challenges
 
-## Deployment
+1. **Challenge 1 (Reentrancy)**: Drain ETH from vulnerable bank using reentrancy
+2. **Challenge 2 (Access Control)**: Implement proper role-based access control
+3. **Challenge 3 (Storage Misalignment)**: Exploit storage collision in upgradeable wallet
+4. **Challenge 4 (Force Send ETH)**: Disable game by forcing ETH balance via selfdestruct
+5. **Challenge 5 (Flash Loan)**: Drain tokens using flash loan approval manipulation
 
-Deploy new challenge:
-```bash
-cd contracts
-forge script script/DeployChallenge1.s.sol:DeployChallenge1 \
-  --rpc-url https://rpc-amoy.polygon.technology \
-  --broadcast \
-  --legacy
-```
 
-Check challenge status:
-```bash
-forge script script/CheckChallengeSolved.s.sol:CheckChallengeSolved \
-  --rpc-url https://rpc-amoy.polygon.technology
-```
+## User Flow
+
+1. Connect wallet (MetaMask via wagmi)
+2. Select challenge from list
+3. View challenge details, vulnerable code, and hints
+4. Write exploit code in Monaco editor
+5. Compile code (backend uses solc)
+6. Test locally (backend runs Foundry tests)
+7. Deploy exploit contract on-chain (Polygon Amoy)
+8. Execute exploit (calls `pwn()` function)
+9. Verify solution (calls `ChallengeFactory.verifyAndRecord()`)
+10. Earn certificate NFT at milestones (5, 10, 20 challenges)
+
+## Features
+
+- Free browser testing via Foundry
+- Automatic exploit funding (Challenge 4 wrapper funds exploits)
+- Progress tracking on-chain
+- Certificate NFTs visible in MetaMask
+- Template-based learning with hints
+- Real-time compilation and testing feedback
 
 ## License
 
