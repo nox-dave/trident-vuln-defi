@@ -54,6 +54,7 @@
 | Challenge2 | Template | `0 ether` | N/A | ✅ Compliant |
 | Challenge3 | ETH-Requiring | `0.001 ether` | `0.0005 ether` withdraw limit | ✅ Compliant |
 | Challenge4 | ETH-Requiring | `0.001 ether` | 2x `0.0005 ether` deposits | ✅ Compliant |
+| Challenge5 | ETH-Requiring | `0.001 ether` | `1e18` tokens minted to pool | ✅ Compliant |
 
 ### Enforcement
 
@@ -131,6 +132,18 @@
   - This matches the pattern of Challenge 1 and Challenge 3 (no user ETH required)
   - **Browser Tests**: Use Foundry's `deal()` cheatcode - NO real ETH needed ✅
   - Challenge descriptions mentioning ETH amounts (e.g., "7 ETH") are educational context only
+
+### Challenge5_Wrapper
+- **Address**: `0x4A585d850D9F5acAe550f81430bbc91631C0a58d`
+- **Challenge ID**: 5
+- **Status**: ✅ Deployed, Registered, and Solved
+- **Purpose**: Wrapper contract implementing IChallenge interface for ERC20 Flash Loan challenge
+- **Initialization**: Requires `0.001 ether` (✅ Compliant with price structure)
+- **Internal Amounts**: `1e18` tokens minted to pool
+- **Key Functions**:
+  - `initialize()` - Initialize with 0.001 ether
+  - `isSolved()` - Returns true if pool token balance is 0
+  - `challengeId()` - Returns 5
 
 ### AccessControl
 - **Address**: `0x0205EdE733Ff8A6cDF5B5BB47D916A35469ECe87`
@@ -210,6 +223,34 @@
   - `pwn()` - Force sends ETH via selfdestruct to disable game (uses ETH received from wrapper)
 - **⚠️ IMPORTANT**: The exploit contract MUST include a `receive()` function to receive ETH from the wrapper's `fundExploit()` call. Without it, the funding transaction will revert.
 
+### LendingPool
+- **Address**: `0x0D2D98D17fE96B2a24c9f4Fe9DE6b53d5671267A`
+- **Status**: ✅ Drained (token balance: 0)
+- **Purpose**: Vulnerable lending pool with flash loan vulnerability
+- **Deployed By**: Challenge5_Wrapper constructor
+- **Key Functions**:
+  - `flashLoan()` - Provides flash loans (vulnerable to approval manipulation)
+  - `token()` - Returns the ERC20 token address
+
+### FlashLoanToken
+- **Address**: `0xaD1c29bd0a38E82CaD8d85e3B08bF0F28112457b`
+- **Status**: ✅ Deployed
+- **Purpose**: ERC20 token for Challenge 5
+- **Deployed By**: Challenge5_Wrapper constructor
+- **Key Functions**:
+  - `mint()` - Mint tokens
+  - `transfer()` - Transfer tokens
+  - `transferFrom()` - Transfer tokens from another address
+  - `approve()` - Approve spender
+
+### LendingPoolExploit
+- **Address**: `0xdd48261140531B7fD3C93Ed03A7e06Cf27fACD4e`
+- **Purpose**: Exploits the flash loan vulnerability in LendingPool
+- **Target**: `0x0D2D98D17fE96B2a24c9f4Fe9DE6b53d5671267A`
+- **Status**: ✅ Executed successfully
+- **Key Functions**:
+  - `pwn()` - Main exploit function that uses flashLoan to approve and drain tokens
+
 ## Account Information
 
 ### Deployer/Owner
@@ -230,7 +271,8 @@ Deployer (0x491dcF33...)
     │                   ├── challengeAddresses[1] = Challenge1_Wrapper
     │                   ├── challengeAddresses[2] = Challenge2_Wrapper
     │                   ├── challengeAddresses[3] = Challenge3_Wrapper
-    │                   └── challengeAddresses[4] = Challenge4_Wrapper (0x739C9206...)
+    │                   ├── challengeAddresses[4] = Challenge4_Wrapper (0x739C9206...)
+    │                   └── challengeAddresses[5] = Challenge5_Wrapper (0x4A585d85...)
     │
     ├── Deploys → Challenge1_Wrapper (0x151868cF...)
     │                   │
@@ -249,6 +291,11 @@ Deployer (0x491dcF33...)
     │                   │
     │                   └── Constructor → SevenEth (0x75D11abC...)
     │
+    ├── Deploys → Challenge5_Wrapper (0x4A585d85...)
+    │                   │
+    │                   ├── Constructor → LendingPool (0x0D2D98D1...)
+    │                   └── Constructor → FlashLoanToken (0xaD1c29bd...)
+    │
     ├── Deploys → EthBankExploit (0x84093c4e...)
     │                   │
     │                   └── Targets → EthBank (0xe8AB2941...)
@@ -256,6 +303,10 @@ Deployer (0x491dcF33...)
     ├── Deploys → UpgradeableWalletExploit (0x02AaBE20...)
     │                   │
     │                   └── Targets → UpgradeableWallet (0x417b2968...)
+    │
+    ├── Deploys → LendingPoolExploit (0xdd482611...)
+    │                   │
+    │                   └── Targets → LendingPool (0x0D2D98D1...)
     │
     └── Users Deploy → SevenEthExploit (TBD)
                         │
@@ -297,6 +348,17 @@ Deployer (0x491dcF33...)
 6. ProgressTracker records the solution
 7. Verification complete ✅
 
+### Challenge 5
+1. User deploys exploit contract and executes pwn() function
+2. Challenge5_Wrapper.isSolved() returns true (pool token balance = 0)
+3. User calls ChallengeFactory.verifyAndRecord(userAddress, 5)
+4. Factory checks:
+   - Challenge is registered ✓
+   - Challenge.isSolved() returns true ✓
+5. Factory calls ProgressTracker.recordSolution(userAddress, 5)
+6. ProgressTracker records the solution
+7. Verification complete ✅
+
 ### Challenge 4
 1. User deploys exploit contract (targeting game address)
 2. **Frontend automatically calls `wrapper.fundExploit(exploitAddress)`** - sends 0.01 ETH from wrapper to exploit
@@ -321,6 +383,7 @@ Deployer (0x491dcF33...)
 - DEPLOYED_CHALLENGES[2]: `0xf6aC18Cb090d27200Be3335cf6B7Bc9fCD6C35Ad`
 - DEPLOYED_CHALLENGES[3]: `0xaF6B5f41D51AF63e5A10b106674Ef45A4AD762C8`
 - DEPLOYED_CHALLENGES[4]: `0x739C920641e896aa48Fb1cDDbc4c1C6568a68Ca2`
+- DEPLOYED_CHALLENGES[5]: `0x4A585d850D9F5acAe550f81430bbc91631C0a58d`
 
 ### Backend Config
 - File: `backend/config/index.js`
@@ -346,6 +409,9 @@ Deployer (0x491dcF33...)
     - `0.001 ether` for game initialization (✅ Price structure compliant for user-facing costs)
     - `0.01 ether` held in wrapper for automatic exploit funding (one-time deployment cost, users don't pay this)
 12. **Registration** - Challenge4_Wrapper registered with factory
+13. **Challenge5_Wrapper** - Deployed and initialized with `0.001 ether` (✅ Price structure compliant)
+14. **Registration** - Challenge5_Wrapper registered with factory
+15. **LendingPoolExploit** - Deployed and executed to solve challenge
 
 ## Notes
 

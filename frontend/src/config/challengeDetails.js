@@ -235,17 +235,7 @@ function pwn() external payable {
     tags: ['solidity', 'hard', 'security', 'ctf'],
     points: 300,
     scenario: 'LendingPool is offering ERC20 flash loans for free.',
-    vulnerableCode: `// SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
-
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-}
-
-contract LendingPool {
+    vulnerableCode: `contract LendingPool {
     IERC20 public token;
 
     constructor(address _token) {
@@ -273,8 +263,6 @@ contract LendingPool {
     ],
     hints: [
       'Approve the exploit contract to transfer tokens from lending pool.',
-      'Use flashLoan to call approve on the token contract.',
-      'Transfer tokens from the pool after approval.',
     ],
     solution: `function pwn() external {
     uint256 bal = token.balanceOf(address(pool));
