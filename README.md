@@ -1,6 +1,6 @@
 <div align="center">
 
-<pre>
+<pre style="color: #ff0000;">
 ┌─────┼─────┐
 ▼     ▼     ▼
 </pre>
@@ -9,9 +9,15 @@
 
 ### Smart Contract Penetration Testing Learning Platform
 
+![TRIDENT Platform](docs/screenshots/challenges.png)
+
 </div>
 
 Educational platform for learning smart contract penetration testing through hands-on exploitation of intentionally vulnerable DeFi contracts.
+
+
+
+
 
 ## Tech Stack
 
