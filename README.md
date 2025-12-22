@@ -9,15 +9,15 @@
 
 ### Smart Contract Penetration Testing Learning Platform
 
-![TRIDENT Platform](docs/screenshots/challenges.png)
-
 </div>
 
 Educational platform for learning smart contract penetration testing through hands-on exploitation of intentionally vulnerable DeFi contracts.
 
+## Screenshots
 
+![Challenge Selection](docs/screenshots/challenges.png)
 
-
+![Platform Interface](docs/screenshots/challenges1.png)
 
 ## Tech Stack
 
