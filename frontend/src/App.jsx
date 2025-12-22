@@ -2,6 +2,7 @@ import { useState } from 'react'
 import WalletConnect from './components/WalletConnect'
 import ChallengeList from './components/ChallengeList'
 import ChallengeInteraction from './components/ChallengeInteraction'
+import CertificateDisplay from './components/CertificateDisplay'
 
 function App() {
   const [selectedChallenge, setSelectedChallenge] = useState(null)
@@ -37,6 +38,7 @@ function App() {
     <div style={styles.app}>
       <TopBar />
       <ChallengeList onSelectChallenge={setSelectedChallenge} />
+      <CertificateDisplay />
     </div>
   )
 }

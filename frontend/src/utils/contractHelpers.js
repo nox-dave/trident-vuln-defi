@@ -14,6 +14,15 @@ export const PROGRESS_TRACKER_ABI = parseAbi([
   'function getSolvedCount(address user) external view returns (uint256)',
 ])
 
+export const CERTIFICATE_ABI = parseAbi([
+  'function hasCertificate(address user, uint256 tokenId) external view returns (bool)',
+  'function getCertificates(address user) external view returns (uint256[] memory)',
+  'function balanceOf(address owner) external view returns (uint256)',
+  'function tokenURI(uint256 tokenId) external view returns (string memory)',
+  'function getMilestoneForTokenId(uint256 tokenId) external view returns (uint256)',
+  'event CertificateMinted(address indexed to, uint256 indexed tokenId, uint256 milestone)',
+])
+
 export const CHALLENGE_ABI = parseAbi([
   'function isSolved() external view returns (bool)',
   'function challengeId() external pure returns (uint256)',
@@ -83,6 +92,33 @@ export async function getChallengeAddress(config, factoryAddress, challengeId) {
     abi: CHALLENGE_FACTORY_ABI,
     functionName: 'getChallengeAddress',
     args: [BigInt(challengeId)],
+  })
+}
+
+export async function getCertificates(config, certificateAddress, userAddress) {
+  return await readContract(config, {
+    address: certificateAddress,
+    abi: CERTIFICATE_ABI,
+    functionName: 'getCertificates',
+    args: [userAddress],
+  })
+}
+
+export async function hasCertificate(config, certificateAddress, userAddress, tokenId) {
+  return await readContract(config, {
+    address: certificateAddress,
+    abi: CERTIFICATE_ABI,
+    functionName: 'hasCertificate',
+    args: [userAddress, BigInt(tokenId)],
+  })
+}
+
+export async function getCertificateMilestone(config, certificateAddress, tokenId) {
+  return await readContract(config, {
+    address: certificateAddress,
+    abi: CERTIFICATE_ABI,
+    functionName: 'getMilestoneForTokenId',
+    args: [BigInt(tokenId)],
   })
 }
 

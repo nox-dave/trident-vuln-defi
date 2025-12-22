@@ -17,10 +17,70 @@
 - **Address**: `0x2B85A7801d11397DfCF28539841da379803E6da7`
 - **Factory**: `0xdB51e44657D578BA9b8Bf48C6fD7F7200884Fb66`
 - **Purpose**: Tracks which users have solved which challenges
+- **Note**: This is the original ProgressTracker deployed before certificate system. Certificates are awarded via CertificateMigrator for users who solved challenges before certificate deployment.
 - **Key Functions**:
   - `recordSolution()` - Records solution (only callable by factory)
   - `hasSolved()` - Check if user solved a challenge
   - `getSolvedCount()` - Get total solved challenges for a user
+
+## NFT Certificate System
+
+### Certificate Contract (ERC-721 NFT)
+- **Contract Address**: `0x836093bAB2DCa08a97567dBbF0c75eE9C6B305c9`
+- **Network**: Polygon Amoy Testnet (Chain ID: 80002)
+- **Collection Name**: "Trident Challenge Certificates"
+- **Collection Symbol**: "TCC"
+- **Type**: Soulbound NFT (SBT) - Non-transferable
+- **Status**: ✅ Active and ERC-721 compatible (visible in MetaMask)
+
+### Certificate Milestones
+- **Token ID 1**: 5 challenges completed
+- **Token ID 2**: 10 challenges completed
+- **Token ID 3**: 20 challenges completed
+
+### Certificate Functions
+- `mint(address to, uint256 tokenId)` - Mint certificate (only ProgressTracker or Migrator can call)
+- `hasCertificate(address user, uint256 tokenId)` - Check if user owns a certificate
+- `getCertificates(address user)` - Get all certificate token IDs owned by user
+- `balanceOf(address owner)` - Get total number of certificates owned
+- `ownerOf(uint256 tokenId)` - Get owner address of a specific token ID
+- `tokenURI(uint256 tokenId)` - Get metadata URI for certificate
+- `tokenOfOwnerByIndex(address owner, uint256 index)` - Get token ID by index (for enumerable)
+- `name()` - Returns "Trident Challenge Certificates"
+- `symbol()` - Returns "TCC"
+- `supportsInterface(bytes4)` - ERC-165 interface detection (returns true for ERC-721)
+
+### CertificateMigrator Contract
+- **Contract Address**: `0xD6583C1dF7B63aeCc0F692746a08309f537666F0`
+- **Network**: Polygon Amoy Testnet (Chain ID: 80002)
+- **Owner**: `0x491dcF33ef2AFa81Fa9b711C81Ed156E6482365c`
+- **Purpose**: Awards certificates retroactively to users who solved challenges before certificate system was deployed
+- **Functions**:
+  - `migrateUser(address user)` - Award certificates based on user's solved challenge count
+  - `migrateMultipleUsers(address[] users)` - Batch migrate multiple users
+- **How It Works**:
+  1. Reads user's solved count from ProgressTracker
+  2. Awards certificates for milestones reached (5, 10, 20 challenges)
+  3. Prevents duplicate migrations (each user can only be migrated once)
+- **Status**: ✅ Active
+
+### NFT Import Information
+To manually import your certificate NFT in MetaMask:
+1. Open MetaMask → NFTs tab
+2. Click "Import NFT"
+3. Enter:
+   - **Contract Address**: `0x836093bAB2DCa08a97567dBbF0c75eE9C6B305c9`
+   - **Token ID**: `1` (for 5 challenges), `2` (for 10 challenges), or `3` (for 20 challenges)
+4. Click "Import"
+
+### View on Block Explorer
+- **Polygonscan (Amoy)**: https://amoy.polygonscan.com/address/0x836093bAB2DCa08a97567dBbF0c75eE9C6B305c9
+- **NFT Token Page**: https://amoy.polygonscan.com/nft/0x836093bAB2DCa08a97567dBbF0c75eE9C6B305c9/{tokenId}
+
+### Deprecated Addresses (No Longer Used)
+- **Old Certificate**: `0xdd9fEe80e98735108ca8db3258a32c463412Ff41` (Not ERC-721 compatible, replaced)
+- **Old Migrator**: `0xBf4937fc4D4476903F693c998e761Ee4cAd75689` (Replaced with new migrator)
+
 
 ## ⚠️ MANDATORY PRICE STRUCTURE STANDARD
 
@@ -262,11 +322,22 @@
 ```
 Deployer (0x491dcF33...)
     │
+    ├── Deploys → Certificate (0x836093bA...) [ERC-721 NFT]
+    │                   │
+    │                   ├── setMigrator → CertificateMigrator address
+    │                   └── ERC-721 compatible for MetaMask
+    │
+    ├── Deploys → CertificateMigrator (0xD6583C1d...)
+    │                   │
+    │                   ├── certificate → Certificate address
+    │                   └── oldProgressTracker → ProgressTracker address
+    │
     ├── Deploys → ChallengeFactory (0xdB51e446...)
     │                   │
     │                   ├── Constructor → ProgressTracker (0x2B85A780...)
     │                   │                   │
-    │                   │                   └── factory = ChallengeFactory address
+    │                   │                   ├── factory = ChallengeFactory address
+    │                   │                   └── certificate = Certificate address
     │                   │
     │                   ├── challengeAddresses[1] = Challenge1_Wrapper
     │                   ├── challengeAddresses[2] = Challenge2_Wrapper
@@ -357,7 +428,20 @@ Deployer (0x491dcF33...)
    - Challenge.isSolved() returns true ✓
 5. Factory calls ProgressTracker.recordSolution(userAddress, 5)
 6. ProgressTracker records the solution
-7. Verification complete ✅
+7. **Certificate Check**: If user reached milestone (5, 10, 20 challenges), Certificate is automatically minted
+8. Verification complete ✅
+
+### Certificate Awarding Flow
+When a user verifies a challenge solution:
+1. `ProgressTracker.recordSolution()` is called by Factory
+2. User's solved count is incremented
+3. If new count matches a milestone (5, 10, or 20 challenges):
+   - Certificate is automatically minted via `CertificateMigrator`
+   - Soulbound NFT is minted to user's wallet
+   - `CertificateMinted` event is emitted
+4. Certificates are non-transferable (Soulbound Tokens)
+
+**Note**: For users who solved challenges before certificate deployment, use `CertificateMigrator.migrateUser(address)` to award certificates retroactively.
 
 ### Challenge 4
 1. User deploys exploit contract (targeting game address)
@@ -379,6 +463,7 @@ Deployer (0x491dcF33...)
 - File: `frontend/src/config/contracts.js`
 - CHALLENGE_FACTORY: `0xdB51e44657D578BA9b8Bf48C6fD7F7200884Fb66`
 - PROGRESS_TRACKER: `0x2B85A7801d11397DfCF28539841da379803E6da7`
+- CERTIFICATE: `0x836093bAB2DCa08a97567dBbF0c75eE9C6B305c9` (ERC-721 NFT Contract)
 - DEPLOYED_CHALLENGES[1]: `0x151868cFA58C4807eDf88B5203EbCfF93ac4c8D7`
 - DEPLOYED_CHALLENGES[2]: `0xf6aC18Cb090d27200Be3335cf6B7Bc9fCD6C35Ad`
 - DEPLOYED_CHALLENGES[3]: `0xaF6B5f41D51AF63e5A10b106674Ef45A4AD762C8`
@@ -395,8 +480,10 @@ Deployer (0x491dcF33...)
 
 ## Deployment Order
 
-1. **ProgressTracker** - Deployed with factory address in constructor
-2. **ChallengeFactory** - Deployed with ProgressTracker address
+1. **Certificate** - Deployed first (no dependencies)
+2. **ProgressTracker** - Deployed with factory address (computed) and Certificate address
+3. **ChallengeFactory** - Deployed with ProgressTracker address
+4. **Certificate.setProgressTracker()** - Called to link Certificate to ProgressTracker
 3. **Challenge1_Wrapper** - Deployed and initialized with `0.001 ether` (✅ Price structure compliant)
 4. **EthBankExploit** - Deployed and executed to solve challenge
 5. **Registration** - Challenge1_Wrapper registered with factory
