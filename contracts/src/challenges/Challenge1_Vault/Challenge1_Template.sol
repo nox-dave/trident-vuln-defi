@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8;
+pragma solidity 0.8.30;
 
 interface IEthBank {
     function deposit() external payable;
+
     function withdraw() external payable;
 }
 
@@ -15,4 +16,3 @@ contract EthBankExploit {
 
     function pwn() external payable {}
 }
-

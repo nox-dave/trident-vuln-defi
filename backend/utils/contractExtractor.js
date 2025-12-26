@@ -347,3 +347,8 @@ export function extractAllContractsExcept(userCode, excludeContractName) {
   return [...interfaces, ...contracts].join('\n\n');
 }
 
+export function contractExistsInContent(content, contractName) {
+  const contractRegex = new RegExp(`(?:contract|interface)\\s+${contractName}\\s*[^{]*\\{`, 'm');
+  return contractRegex.test(content);
+}
+
