@@ -5,27 +5,31 @@ import "../../IChallenge.sol";
 import "./Challenge2_Access.sol";
 
 contract Challenge2_Wrapper is IChallenge {
-    AccessControl public immutable accessControl;
+    UpgradeableWallet public immutable wallet;
+    WalletImplementation public immutable implementation;
+    uint256 private constant INIT_AMOUNT = 1 ether;
     bool private _initialized;
 
     error AlreadyInitialized();
+    error InsufficientFunds();
 
     constructor() {
-        accessControl = new AccessControl();
+        implementation = new WalletImplementation();
+        wallet = new UpgradeableWallet(address(implementation));
     }
 
-    function initialize() external {
+    function initialize() external payable {
         if (_initialized) revert AlreadyInitialized();
+        if (address(this).balance < INIT_AMOUNT) revert InsufficientFunds();
+
         _initialized = true;
+        
+        (bool success, ) = address(wallet).call{value: INIT_AMOUNT}("");
+        require(success, "Failed to fund wallet");
     }
 
     function isSolved() external view override returns (bool) {
-        if (!_initialized) return false;
-
-        bytes32 ADMIN = accessControl.ADMIN();
-        bytes32 USER = accessControl.USER();
-
-        return ADMIN != bytes32(0) && USER != bytes32(0);
+        return _initialized && address(wallet).balance == 0;
     }
 
     function challengeId() external pure override returns (uint256) {
@@ -34,5 +38,14 @@ contract Challenge2_Wrapper is IChallenge {
 
     function initialized() external view returns (bool) {
         return _initialized;
+    }
+
+    receive() external payable {
+        if (!_initialized && address(this).balance >= INIT_AMOUNT) {
+            _initialized = true;
+            
+            (bool success, ) = address(wallet).call{value: INIT_AMOUNT}("");
+            require(success, "Failed to fund wallet");
+        }
     }
 }

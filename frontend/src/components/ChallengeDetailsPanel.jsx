@@ -124,11 +124,32 @@ function ChallengeDetailsPanel({ challenge, details }) {
             </div>
             {hintExpanded && (
               <div style={styles.hints}>
-                {details.hints.map((hint, index) => (
-                  <div key={index} style={styles.hint}>
-                    {hint}
-                  </div>
-                ))}
+                {details.hints.map((hint, index) => {
+                  const trimmedHint = typeof hint === 'string' ? hint.trim() : ''
+                  const isCode = typeof hint === 'string' && (
+                    trimmedHint.startsWith('function') ||
+                    trimmedHint.startsWith('contract') ||
+                    trimmedHint.startsWith('interface') ||
+                    trimmedHint.startsWith('modifier') ||
+                    trimmedHint.startsWith('event') ||
+                    trimmedHint.startsWith('enum') ||
+                    trimmedHint.startsWith('struct') ||
+                    trimmedHint.startsWith('library') ||
+                    (trimmedHint.includes('function ') && trimmedHint.includes('{') && trimmedHint.includes('}'))
+                  )
+                  
+                  return (
+                    <div key={index} style={styles.hint}>
+                      {isCode ? (
+                        <div style={styles.hintCodeContainer}>
+                          <CodeViewer code={hint} />
+                        </div>
+                      ) : (
+                        hint
+                      )}
+                    </div>
+                  )
+                })}
                 {details.solution && (
                   <div style={styles.solutionContainer}>
                     <CodeViewer code={details.solution} />
@@ -288,6 +309,12 @@ const styles = {
     lineHeight: '1.6',
     color: '#ffffff',
     marginBottom: '8px',
+  },
+  hintCodeContainer: {
+    marginTop: '8px',
+    marginBottom: '8px',
+    height: '100px',
+    width: '100%',
   },
   solutionContainer: {
     marginTop: '16px',

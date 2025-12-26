@@ -23,10 +23,12 @@ contract DeployChallenge2 is Script {
 
         Challenge2_Wrapper wrapper = new Challenge2_Wrapper();
         
-        wrapper.initialize();
+        vm.deal(address(wrapper), 1 ether);
+        wrapper.initialize{value: 1 ether}();
 
         console.log("Challenge2_Wrapper deployed at:", address(wrapper));
-        console.log("AccessControl deployed at:", address(wrapper.accessControl()));
+        console.log("UpgradeableWallet deployed at:", address(wrapper.wallet()));
+        console.log("WalletImplementation deployed at:", address(wrapper.implementation()));
         console.log("Initialized:", wrapper.initialized());
 
         try vm.envAddress("CHALLENGE_FACTORY") returns (address factoryAddress) {

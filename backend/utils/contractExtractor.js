@@ -271,3 +271,79 @@ export function getChallengeFolder(challengeId, challengeMap) {
   return folder;
 }
 
+export function extractAllContractsExcept(userCode, excludeContractName) {
+  const normalizedCode = userCode.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const contracts = [];
+  const interfaces = [];
+  
+  const contractRegex = /(?:contract|interface)\s+(\w+)\s*[^{]*\{/g;
+  let match;
+  const foundContracts = new Set();
+  const matches = [];
+  
+  while ((match = contractRegex.exec(normalizedCode)) !== null) {
+    matches.push({ index: match.index, name: match[1], fullMatch: match[0] });
+  }
+  
+  for (const match of matches) {
+    const contractName = match.name;
+    if (contractName !== excludeContractName && !foundContracts.has(contractName)) {
+      foundContracts.add(contractName);
+      const contractStart = match.index;
+      const isInterface = normalizedCode.substring(contractStart, contractStart + 9) === 'interface';
+      
+      let braceCount = 0;
+      let foundOpening = false;
+      let endIdx = contractStart;
+      let inString = false;
+      let inComment = false;
+      let inSingleLineComment = false;
+      
+      for (let i = contractStart; i < normalizedCode.length; i++) {
+        const char = normalizedCode[i];
+        const nextChar = normalizedCode[i + 1] || '';
+        
+        if (!inString && !inComment) {
+          if (char === '/' && nextChar === '/') {
+            inSingleLineComment = true;
+          } else if (char === '/' && nextChar === '*') {
+            inComment = true;
+            i++;
+          } else if (char === '"' || char === "'") {
+            inString = true;
+          } else if (char === '{') {
+            braceCount++;
+            foundOpening = true;
+          } else if (char === '}') {
+            braceCount--;
+            if (foundOpening && braceCount === 0) {
+              endIdx = i;
+              break;
+            }
+          }
+        } else {
+          if (inSingleLineComment && char === '\n') {
+            inSingleLineComment = false;
+          } else if (inComment && char === '*' && nextChar === '/') {
+            inComment = false;
+            i++;
+          } else if (inString && (char === '"' || char === "'")) {
+            inString = false;
+          }
+        }
+      }
+      
+      if (foundOpening && braceCount === 0) {
+        const extracted = normalizedCode.substring(contractStart, endIdx + 1);
+        if (isInterface) {
+          interfaces.push(extracted);
+        } else {
+          contracts.push(extracted);
+        }
+      }
+    }
+  }
+  
+  return [...interfaces, ...contracts].join('\n\n');
+}
+

@@ -13,7 +13,8 @@ import {
   replaceContract,
   extractTestFunctionName,
   extractError,
-  getChallengeFolder
+  getChallengeFolder,
+  extractAllContractsExcept
 } from '../utils/contractExtractor.js';
 
 const execAsync = promisify(exec);
@@ -53,17 +54,36 @@ export class TestingService {
     let updatedChallengeContent = null;
     
     if (challengeIdNum === 2) {
-      const targetContractName = vulnerableContractName || 'AccessControl';
-      log.info('🔍', `Challenge 2: Looking for contract "${targetContractName}" in user code`);
-      contractName = targetContractName;
-      contractToReplace = extractContractFromUserCode(exploitCode, targetContractName);
-      if (!contractToReplace) {
-        log.error('❌', `Failed to extract ${targetContractName} from user code`);
-        log.error('❌', `User code length: ${exploitCode.length}, contains contract: ${exploitCode.includes('contract ' + targetContractName)}`);
-        throw new Error(`Could not extract ${targetContractName} contract from user code. Make sure your contract is properly formatted with matching braces and named "${targetContractName}".`);
+      if (!exploitContractName) {
+        throw new Error('Could not find exploit contract name in challenge file');
       }
-      log.info('✅', `Successfully extracted ${targetContractName} contract`);
-      updatedChallengeContent = replaceContract(challengeContent, contractToReplace, targetContractName);
+      contractName = exploitContractName;
+      contractToReplace = extractExploitContractFromUserCode(exploitCode, exploitContractName);
+      if (!contractToReplace) {
+        log.error('❌', 'Failed to extract contract from user code');
+        throw new Error('Could not extract exploit contract from user code. Make sure your contract is properly formatted with matching braces.');
+      }
+      
+      const additionalContracts = extractAllContractsExcept(exploitCode, exploitContractName);
+      
+      let contentToReplace = challengeContent;
+      if (additionalContracts.trim()) {
+        log.info('📦', `Found additional contracts/interfaces: ${additionalContracts.substring(0, 100)}...`);
+        const exploitContractRegex = new RegExp(`(contract\\s+${exploitContractName}\\s*[^{]*\\{)`, 'm');
+        const match = contentToReplace.match(exploitContractRegex);
+        if (match && match.index !== undefined) {
+          const insertIndex = match.index;
+          const beforeExploit = contentToReplace.substring(0, insertIndex).trim();
+          const afterExploit = contentToReplace.substring(insertIndex);
+          contentToReplace = beforeExploit + '\n\n' + additionalContracts.trim() + '\n\n' + afterExploit;
+        } else {
+          contentToReplace = contentToReplace.trim() + '\n\n' + additionalContracts.trim();
+        }
+      } else {
+        log.info('ℹ️', 'No additional contracts found in user code');
+      }
+      
+      updatedChallengeContent = replaceExploitContract(contentToReplace, contractToReplace, exploitContractName);
     } else {
       if (!exploitContractName) {
         throw new Error('Could not find exploit contract name in challenge file');
@@ -74,7 +94,26 @@ export class TestingService {
         log.error('❌', 'Failed to extract contract from user code');
         throw new Error('Could not extract exploit contract from user code. Make sure your contract is properly formatted with matching braces.');
       }
-      updatedChallengeContent = replaceExploitContract(challengeContent, contractToReplace, exploitContractName);
+      const additionalContracts = extractAllContractsExcept(exploitCode, exploitContractName);
+      
+      let contentToReplace = challengeContent;
+      if (additionalContracts.trim()) {
+        log.info('📦', `Found additional contracts/interfaces: ${additionalContracts.substring(0, 100)}...`);
+        const exploitContractRegex = new RegExp(`(contract\\s+${exploitContractName}\\s*[^{]*\\{)`, 'm');
+        const match = contentToReplace.match(exploitContractRegex);
+        if (match && match.index !== undefined) {
+          const insertIndex = match.index;
+          const beforeExploit = contentToReplace.substring(0, insertIndex).trim();
+          const afterExploit = contentToReplace.substring(insertIndex);
+          contentToReplace = beforeExploit + '\n\n' + additionalContracts.trim() + '\n\n' + afterExploit;
+        } else {
+          contentToReplace = contentToReplace.trim() + '\n\n' + additionalContracts.trim();
+        }
+      } else {
+        log.info('ℹ️', 'No additional contracts found in user code');
+      }
+      
+      updatedChallengeContent = replaceExploitContract(contentToReplace, contractToReplace, exploitContractName);
     }
     
     const openBraces = (contractToReplace.match(/\{/g) || []).length;

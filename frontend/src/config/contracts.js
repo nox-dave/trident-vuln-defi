@@ -22,8 +22,8 @@ export const CHALLENGES = [
   },
   {
     id: 2,
-    name: 'Access Control',
-    description: 'Exploit tx.origin authentication flaw',
+    name: 'Improper Access Control',
+    description: 'Exploit missing access control in upgradeable wallet',
     difficulty: 'Easy',
     ascii: '  ┌ ┐\n    │\n  └ ┘',
   },

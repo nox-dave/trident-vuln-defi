@@ -112,7 +112,7 @@ Each challenge includes:
 ### The 5 Challenges
 
 1. **Challenge 1 (Reentrancy)**: Drain ETH from vulnerable bank using reentrancy
-2. **Challenge 2 (Access Control)**: Implement proper role-based access control
+2. **Challenge 2 (Improper Access Control)**: Exploit upgradeable wallet access control vulnerability
 3. **Challenge 3 (Storage Misalignment)**: Exploit storage collision in upgradeable wallet
 4. **Challenge 4 (Force Send ETH)**: Disable game by forcing ETH balance via selfdestruct
 5. **Challenge 5 (Flash Loan)**: Drain tokens using flash loan approval manipulation
